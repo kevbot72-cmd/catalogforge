@@ -1,0 +1,37 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "CatalogForge",
+  "version": "0.1.0",
+  "identifier": "com.catalogforge.desktop",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "CatalogForge",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 1024,
+        "minHeight": 640,
+        "dragDropEnabled": true
+      }
+    ],
+    "security": {
+      "csp": null,
+      "assetProtocol": { "enable": true, "scope": ["**"] }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
+    "resources": { "../../../plugin/catalogforge-connector": "catalogforge-connector" },
+    "category": "Business",
+    "shortDescription": "Bulk catalog manager for WooCommerce",
+    "longDescription": "Spreadsheet-speed product, category and media management for WooCommerce stores, including sites running in Local."
+  }
+}

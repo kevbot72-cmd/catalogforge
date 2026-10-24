@@ -4,3 +4,4 @@ dist/
 .DS_Store
 *.log
 apps/desktop/src-tauri/gen/
+apps/desktop/e2e/screenshots/

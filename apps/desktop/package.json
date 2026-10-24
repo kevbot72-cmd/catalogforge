@@ -1,0 +1,52 @@
+{
+  "name": "catalogforge-desktop",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview --port 4173",
+    "test": "vitest run",
+    "e2e": "node e2e/run.mjs",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@glideapps/glide-data-grid": "^6.0.3",
+    "@tauri-apps/api": "^2.12.4",
+    "@tauri-apps/plugin-dialog": "^2.8.3",
+    "@tiptap/extension-link": "^2.10.3",
+    "@tiptap/extension-placeholder": "^2.10.3",
+    "@tiptap/extension-text-align": "^2.10.3",
+    "@tiptap/extension-underline": "^2.10.3",
+    "@tiptap/pm": "^2.10.3",
+    "@tiptap/react": "^2.10.3",
+    "@tiptap/starter-kit": "^2.10.3",
+    "clsx": "^2.1.1",
+    "cmdk": "^1.0.0",
+    "lodash": "^4.17.21",
+    "lucide-react": "^0.460.0",
+    "marked": "^4.3.0",
+    "papaparse": "^5.4.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-responsive-carousel": "^3.2.23",
+    "xlsx": "^0.18.5",
+    "zustand": "^4.5.5"
+  },
+  "devDependencies": {
+    "@tailwindcss/typography": "^0.5.15",
+    "@tauri-apps/cli": "^2.12.4",
+    "@types/lodash": "^4.17.13",
+    "@types/papaparse": "^5.3.15",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.15",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11",
+    "vitest": "^2.1.5"
+  }
+}

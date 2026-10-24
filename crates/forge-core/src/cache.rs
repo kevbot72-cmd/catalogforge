@@ -361,6 +361,13 @@ impl Cache {
         })
     }
 
+    /// (sku, id, type) for every server product with a SKU — a light index for import matching.
+    pub fn sku_index(&self) -> Result<Vec<(String, i64, String)>> {
+        let mut stmt = self.conn.prepare("SELECT sku, id, COALESCE(type,'') FROM products WHERE sku IS NOT NULL AND sku <> ''")?;
+        let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
     pub fn children(&self, parent: i64) -> Result<Vec<i64>> {
         let mut stmt = self.conn.prepare_cached("SELECT id FROM products WHERE parent_id = ?1 ORDER BY id")?;
         let rows = stmt.query_map([parent], |r| r.get(0))?;
@@ -640,6 +647,27 @@ impl Cache {
             out.push(ProductRow { product, state });
         }
         Ok(out)
+    }
+
+    /// Keys of a parent's variations: server children plus staged new variations pointing at it.
+    pub fn variation_keys(&self, parent_key: &str) -> Result<Vec<String>> {
+        let mut keys: Vec<String> = match parent_key.parse::<i64>() {
+            Ok(id) => self.children(id)?.into_iter().map(|c| c.to_string()).collect(),
+            Err(_) => vec![],
+        };
+        for ((entity, key), fields) in self.staged_map()? {
+            if entity != Entity::Variation || !key.starts_with(NEW_PREFIX) {
+                continue;
+            }
+            let parent = fields.get("parent_id").map(|v| match &v.0 {
+                Value::String(s) => s.clone(),
+                other => other.to_string(),
+            });
+            if parent.as_deref() == Some(parent_key) {
+                keys.push(key);
+            }
+        }
+        Ok(keys)
     }
 
     pub fn category_rows(&self) -> Result<Vec<ProductRow>> {
@@ -1093,6 +1121,20 @@ mod tests {
         let s = c.summary().unwrap();
         assert_eq!((s.modified, s.deleted), (1, 1));
         assert_eq!(c.rows(&["1".into()]).unwrap()[0].product["regular_price"], "9");
+    }
+
+    #[test]
+    fn variation_keys_include_staged_children() {
+        let mut c = cache();
+        let mut v = product(20, "Alpha - S", "1");
+        v.kind = "variation".into();
+        v.parent_id = 1;
+        c.upsert_products(&[v]).unwrap();
+        let nv = c.create(Entity::Variation, serde_json::from_value(json!({ "parent_id": 1 })).unwrap()).unwrap();
+        let other = c.create(Entity::Variation, serde_json::from_value(json!({ "parent_id": 2 })).unwrap()).unwrap();
+        let keys = c.variation_keys("1").unwrap();
+        assert_eq!(keys, vec!["20".to_string(), nv]);
+        assert!(!keys.contains(&other));
     }
 
     #[test]
