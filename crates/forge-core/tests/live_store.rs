@@ -396,3 +396,37 @@ async fn custom_fields_discover_edit_push_and_conflict() {
     assert_eq!(report.conflicts, 1, "{report:?}");
     assert_eq!(reader.catalog_by_ids(&[id]).await.unwrap().products[0].meta.get(&brand), Some(&json!("Theirs")));
 }
+
+#[tokio::test]
+async fn media_delete_removes_attachment_and_cache_entry() {
+    let Some(driver) = connector() else { return eprintln!("CF_TEST_URL not set; skipping") };
+    let tmp = tempfile::tempdir().unwrap();
+    let cache = Mutex::new(Cache::open(&tmp.path().join("c.db")).unwrap());
+    let img = tmp.path().join("doomed.png");
+    test_image(&img, rand::random());
+    let s = sfx();
+    cache.lock().unwrap().create(Entity::Product, obj(json!({ "name": format!("Doomed {s}"), "type": "simple", "sku": format!("DOOM-{s}"), "image_id": { "file": img.to_string_lossy() } }))).unwrap();
+    let r = sync::push(&driver, &cache, &MediaSettings::default(), "With image", no_progress()).await.unwrap();
+    assert!(r.errors.is_empty(), "{:?}", r.errors);
+    let key = cache.lock().unwrap().query(&ProductQuery { search: format!("DOOM-{s}"), ..Default::default() }).unwrap().keys[0].clone();
+    let media_id = cache.lock().unwrap().rows(&[key.clone()]).unwrap()[0].product["image_id"].as_i64().unwrap();
+    assert!(media_id > 0);
+
+    // What the Media page stages: take the image off the product, then delete it.
+    cache
+        .lock()
+        .unwrap()
+        .stage(&[
+            Edit { entity: Entity::Product, key: key.clone(), field: "image_id".into(), value: Some(json!(0)) },
+            Edit { entity: Entity::Media, key: media_id.to_string(), field: "__delete".into(), value: Some(json!(true)) },
+        ])
+        .unwrap();
+    assert!(!cache.lock().unwrap().all_media().unwrap().iter().any(|m| m.id == media_id), "hidden while staged");
+    let r = sync::push(&driver, &cache, &MediaSettings::default(), "Delete image", no_progress()).await.unwrap();
+    assert!(r.errors.is_empty(), "{:?}", r.errors);
+    assert_eq!(r.deleted, 1);
+    assert!(cache.lock().unwrap().media(&[media_id]).unwrap().is_empty(), "removed from the cache");
+    let server = MysqlDriver::connect(&mysql_target(), None).await.unwrap();
+    assert!(server.media_for(&[media_id]).await.unwrap().is_empty(), "attachment deleted on the store");
+    assert_eq!(server.catalog_by_ids(&[key.parse().unwrap()]).await.unwrap().products[0].image_id, 0);
+}

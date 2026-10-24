@@ -377,7 +377,8 @@ export function ProductGrid({ columns }: { columns: ColumnDef[] }) {
         onCellClicked={([col, row]) => {
           const c = columns[col];
           const r = rowsRef.current.get(row);
-          if (!r) return;
+          // The row tick boxes report col -1.
+          if (!r || !c) return;
           if (c.id === "_expand" && r.type === "variable") {
             const exp = new Set(query.expanded ?? []);
             if (exp.has(r._state.key)) exp.delete(r._state.key);
@@ -389,7 +390,8 @@ export function ProductGrid({ columns }: { columns: ColumnDef[] }) {
         onCellActivated={([col, row]) => {
           const c = columns[col];
           const r = rowsRef.current.get(row);
-          if (!r) return;
+          // The row tick boxes report col -1.
+          if (!r || !c) return;
           if (c.kind === "cats" || c.kind === "html" || c.kind === "image" || c.id === "type" || c.id === "id") openDrawer(r.type === "variation" ? String(r.parent_id) : r._state.key);
         }}
         getRowThemeOverride={(row) => {

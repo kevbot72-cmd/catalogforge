@@ -309,9 +309,12 @@ impl Cache {
         Ok(out)
     }
 
+    /// The media library, without items staged for deletion.
     pub fn all_media(&self) -> Result<Vec<Media>> {
-        let mut stmt = self.conn.prepare("SELECT data FROM media ORDER BY id DESC")?;
-        let rows = stmt.query_map([], |r| r.get::<_, String>(0))?;
+        let mut stmt = self.conn.prepare(
+            "SELECT data FROM media WHERE CAST(id AS TEXT) NOT IN (SELECT key FROM staged WHERE entity = 'media' AND field = ?1) ORDER BY id DESC",
+        )?;
+        let rows = stmt.query_map([DELETE_FIELD], |r| r.get::<_, String>(0))?;
         rows.map(|r| Ok(serde_json::from_str(&r?)?)).collect()
     }
 

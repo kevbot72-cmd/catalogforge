@@ -1,6 +1,7 @@
 import { BookOpen, Boxes, ChevronDown, ChevronRight, FolderTree, History, Image as ImageIcon, Moon, Package, Plus, Settings, Sun, Tag } from "lucide-react";
-import { useMemo, useState } from "react";
-import type { CategoryRow, LocalFile } from "../backend/types";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { CategoryRow, Edit, LocalFile, ProductRow } from "../backend/types";
+import { ancestorKeys, assignCategory, catKey } from "../lib/categoryAssign";
 import { useApp, type View } from "../store/app";
 import { categoryTree } from "./fields";
 import { Badge, clsx, Dropzone, mediaUrl, Thumb } from "./ui";
@@ -52,8 +53,18 @@ function NavItem({ id, icon, label, count }: { id: View; icon: React.ReactNode; 
 }
 
 function CategoryFilterTree() {
-  const { taxonomy, query, setQuery, media, stage, selection, toast } = useApp();
+  const { taxonomy, query, setQuery, media, stage, selection, toast, backend, storeId, version, catWithParents, setCatWithParents } = useApp();
   const [open, setOpen] = useState<Set<string>>(new Set());
+  // Selected products (not variations), for ticking categories on them.
+  const [picked, setPicked] = useState<ProductRow[]>([]);
+  useEffect(() => {
+    if (!storeId || !selection.length) return setPicked([]);
+    let cancelled = false;
+    backend.rows(storeId, selection).then((r) => !cancelled && setPicked(r.filter((x) => x.type !== "variation" && !x._state.deleted)));
+    return () => {
+      cancelled = true;
+    };
+  }, [backend, storeId, selection, version]);
   const cats = useMemo(() => (taxonomy?.categories ?? []).filter((c) => !c._state.deleted), [taxonomy]);
   const { keyOf, children } = useMemo(() => categoryTree(cats), [cats]);
   const totals = useMemo(() => {
@@ -75,32 +86,42 @@ function CategoryFilterTree() {
     toast({ tone: "success", title: `Thumbnail set for “${c.name}”`, body: "Uploaded with your next push." });
   };
 
+  // Parents of categories the selected products are in open automatically.
+  const holds = useMemo(() => new Set(picked.flatMap((r) => r.category_ids.flatMap((id) => ancestorKeys(cats, String(id))))), [picked, cats]);
+  /** all / some / none of the selected products are in the category. */
+  const tick = (k: string): "all" | "some" | "none" => {
+    const n = picked.filter((r) => r.category_ids.map(String).includes(k)).length;
+    return n === 0 ? "none" : n === picked.length ? "all" : "some";
+  };
+  const toggleFor = async (c: CategoryRow) => {
+    const on = tick(catKey(c)) !== "all";
+    const edits: Edit[] = [];
+    for (const r of picked) {
+      const next = assignCategory(r.category_ids, cats, c, on, catWithParents);
+      if (next.length !== r.category_ids.length || next.some((v, i) => String(v) !== String(r.category_ids[i]))) edits.push({ entity: "product", key: r._state.key, field: "category_ids", value: next });
+    }
+    if (!edits.length) return;
+    await stage(edits);
+    toast({ tone: "success", title: on ? `Added ${edits.length} product${edits.length === 1 ? "" : "s"} to ${c.name}${catWithParents && c.parent && String(c.parent) !== "0" ? " and its parents" : ""}` : `Removed ${edits.length} product${edits.length === 1 ? "" : "s"} from ${c.name}`, body: "Undo with ⌘Z." });
+  };
+
   const renderNode = (c: CategoryRow, depth: number): JSX.Element => {
     const k = keyOf(c);
     const kids = children.get(k) ?? [];
-    const isOpen = open.has(k);
+    const isOpen = open.has(k) || (!open.has(`-${k}`) && holds.has(k));
     const active = query.category_id !== undefined && query.category_id !== null && String(query.category_id) === k;
     return (
       <div key={k}>
         <Dropzone toFiles={useApp.getState().backend.filesFromDrop} onFiles={(f) => setImage(c, f)} className="rounded-md" activeClassName="ring-1 ring-accent bg-accent/10">
           <div className={clsx("group flex items-center gap-1 rounded-md py-1 pr-1 text-[13px]", active ? "bg-accent/10 text-accent" : "text-muted hover:bg-sunken hover:text-fg")} style={{ paddingLeft: depth * 12 + 4 }}>
-            <button className="w-4 shrink-0 text-muted" onClick={() => setOpen((s) => new Set(s.has(k) ? [...s].filter((x) => x !== k) : [...s, k]))} aria-label={isOpen ? "Collapse" : "Expand"}>
+            <button className="w-4 shrink-0 text-muted" onClick={() => setOpen((s) => new Set([...[...s].filter((x) => x !== k && x !== `-${k}`), isOpen ? `-${k}` : k]))} aria-label={isOpen ? `Collapse ${c.name}` : `Expand ${c.name}`}>
               {kids.length ? isOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} /> : null}
             </button>
             <Thumb src={mediaUrl(c.image_id, media)} size={18} />
+            {picked.length > 0 && <TriCheckbox state={tick(k)} onChange={() => toggleFor(c)} label={`${c.name} for the selected products`} testId={`cat-tick-${c.name}`} />}
             <button className="min-w-0 flex-1 truncate text-left" onClick={() => setQuery({ category_id: active ? null : (c._state.is_new ? null : c.id), uncategorized: false })} title="Filter products · drop an image here to set the category thumbnail">
               {c.name}
             </button>
-            {selection.length > 0 && !c._state.is_new && (
-              <button className="hidden rounded px-1 text-2xs text-accent hover:bg-accent/10 group-hover:block" title={`Add ${selection.length} selected products to ${c.name}`} onClick={async () => {
-                const rows = await useApp.getState().backend.rows(useApp.getState().storeId!, selection);
-                const edits = rows.filter((r) => r.type !== "variation" && !r.category_ids.map(String).includes(k)).map((r) => ({ entity: "product" as const, key: r._state.key, field: "category_ids", value: [...r.category_ids, c.id] }));
-                await stage(edits);
-                toast({ tone: "success", title: `Added ${edits.length} products to ${c.name}` });
-              }}>
-                + add
-              </button>
-            )}
             <span className="text-2xs tabular-nums">{totals.get(k) || ""}</span>
           </div>
         </Dropzone>
@@ -112,6 +133,14 @@ function CategoryFilterTree() {
   return (
     <div className="min-h-0 flex-1 overflow-auto px-2 pb-2" data-testid="category-tree">
       <div className="px-2 pb-1 pt-3 text-2xs font-semibold uppercase tracking-wide text-muted">Categories</div>
+      {picked.length > 0 ? (
+        <div className="mx-1 mb-1 space-y-1 rounded-md bg-accent/5 p-2 text-2xs text-muted" data-testid="cat-assign-bar">
+          <div><b className="text-fg">{picked.length} selected product{picked.length === 1 ? "" : "s"}</b>: tick or untick categories. A dash means only some of them are in it.</div>
+          <label className="flex items-center gap-1.5"><input type="checkbox" checked={catWithParents} onChange={(e) => setCatWithParents(e.target.checked)} /> Also tick parent categories</label>
+        </div>
+      ) : (
+        <div className="px-2 pb-1 text-2xs text-muted">Select products in the grid to tick their categories here.</div>
+      )}
       <button onClick={() => setQuery({ category_id: null, uncategorized: false })} className={clsx("w-full rounded-md px-2 py-1 text-left text-[13px]", !query.category_id && !query.uncategorized ? "bg-sunken text-fg" : "text-muted hover:bg-sunken")}>
         All products
       </button>
@@ -150,4 +179,12 @@ export function Sidebar() {
       </div>
     </aside>
   );
+}
+
+function TriCheckbox({ state, onChange, label, testId }: { state: "all" | "some" | "none"; onChange: () => void; label: string; testId?: string }) {
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = state === "some";
+  }, [state]);
+  return <input ref={ref} type="checkbox" checked={state === "all"} onChange={onChange} aria-label={label} title={state === "some" ? "Some of the selected products are in this category" : undefined} className="shrink-0 accent-[rgb(var(--accent))]" data-testid={testId} />;
 }

@@ -341,6 +341,72 @@ await step("catalogue: leave out a category, restyle, use a PDF template and cre
   console.log(`        ${out.getPageCount()} pages, ${(bytes.length / 1048576).toFixed(1)} MB`);
 }, 300000);
 
+await step("categories: tick and untick parent and sub-categories for selected products", async () => {
+  await page.getByTestId("nav-products").click();
+  await page.getByTestId("search").fill("Trail");
+  await page.waitForTimeout(600);
+  await page.mouse.click(cell(22, 0).x, cell(22, 0).y);
+  await page.keyboard.down("Shift");
+  await page.mouse.click(cell(22, 1).x, cell(22, 1).y);
+  await page.keyboard.up("Shift");
+  await page.getByTestId("cat-assign-bar").waitFor();
+  expect((await page.getByTestId("cat-assign-bar").innerText()).includes("2 selected products"), "two products selected");
+  // Sub-category only.
+  await page.getByLabel("Expand Home").click();
+  await page.getByTestId("cat-tick-Mugs").check();
+  await page.getByText(/Added 2 products to Mugs$/).waitFor();
+  expect(!(await page.getByTestId("cat-tick-Home").isChecked()), "parent stays unticked");
+  // Sub-category with its parent.
+  await page.getByLabel("Also tick parent categories").check();
+  await page.getByTestId("cat-tick-Candles").check();
+  await page.getByText("Added 2 products to Candles and its parents").waitFor();
+  expect(await page.getByTestId("cat-tick-Home").isChecked(), "parent ticked too");
+  // Fix a mistake: untick the parent only.
+  await page.getByTestId("cat-tick-Home").uncheck();
+  await page.getByText("Removed 2 products from Home").waitFor();
+  expect(await page.getByTestId("cat-tick-Candles").isChecked(), "sub-category kept");
+  await shot("20-category-ticks");
+  await page.getByLabel("Also tick parent categories").uncheck();
+  // The product editor shows the same choice as full paths.
+  await page.getByTestId("open-palette").click();
+  await page.getByTestId("palette").locator("input").fill("Trail");
+  await page.waitForTimeout(400);
+  await page.getByTestId("palette").locator('[cmdk-item][data-value^="product"]').first().click();
+  await page.getByRole("tab", { name: "Organisation" }).click();
+  const chips = await page.getByTestId("category-chips").innerText();
+  expect(chips.includes("Home › Candles") && chips.includes("Home › Mugs"), `chips show paths: ${chips}`);
+  await shot("21-category-picker");
+  await page.getByLabel("Close drawer").click();
+  await page.getByTestId("search").fill("");
+});
+
+await step("media: select, select all, and delete selected (with undo)", async () => {
+  await page.getByTestId("nav-media").click();
+  const tiles = page.getByTestId("media-tile");
+  await tiles.first().waitFor();
+  const before = await tiles.count();
+  await tiles.nth(0).locator("button").first().click();
+  await tiles.nth(3).locator("button").first().click({ modifiers: ["Shift"] });
+  expect((await page.getByTestId("media-selected-count").innerText()).startsWith("4 selected"), "shift-click selects a range");
+  await page.getByTestId("media-select-all").click();
+  expect((await page.getByTestId("media-selected-count").innerText()).startsWith(`${before.toLocaleString("en-US")} selected`), "select all");
+  await page.getByTestId("media-select-all").click();
+  await tiles.nth(0).locator("button").first().click();
+  await tiles.nth(1).locator("button").first().click();
+  const gone = [await tiles.nth(0).locator(".truncate").first().innerText(), await tiles.nth(1).locator(".truncate").first().innerText()];
+  const present = async () => (await page.getByTestId("media-grid").innerText()).split("\n").filter((l) => gone.includes(l)).length;
+  await page.getByTestId("media-delete").click();
+  await page.getByTestId("media-delete-dialog").waitFor();
+  await shot("22-media-delete");
+  await page.getByTestId("media-delete-confirm").click();
+  await page.getByText(/2 images will be deleted when you push/).waitFor();
+  await page.waitForTimeout(300);
+  expect((await present()) === 0, `deleted images are gone (${gone.join(", ")})`);
+  await page.keyboard.press("Control+z");
+  await page.waitForTimeout(600);
+  expect((await present()) === 2, "undo restores them");
+});
+
 await step("dark mode", async () => {
   await page.getByTestId("nav-products").click();
   await page.getByLabel("Toggle dark mode").click();

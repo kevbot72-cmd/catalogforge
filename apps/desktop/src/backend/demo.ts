@@ -452,7 +452,8 @@ export function createDemoBackend(): Backend {
       };
     },
     async media(id) {
-      return [...S(id).media.values()].sort((a, b) => b.id - a.id);
+      const s = S(id);
+      return [...s.media.values()].filter((m) => !s.staged.get(skey("media", String(m.id)))?.has(DEL)).sort((a, b) => b.id - a.id);
     },
     async stage(id, edits) {
       const s = S(id);
@@ -576,6 +577,7 @@ export function createDemoBackend(): Backend {
         if (fields.has(DEL)) {
           const nid = Number(key);
           if (entity === "category") s.categories.delete(nid);
+          else if (entity === "media") s.media.delete(nid);
           else s.products.delete(nid);
           report.deleted++;
           items.push({ entity, id: nid, label: labelOf, field: DEL, before: null, after: true, action: "deleted" });

@@ -5,15 +5,16 @@
 Tested against WordPress 6.8.3 + WooCommerce 9.9.5 on MariaDB (PHP built-in server):
 
 - **Plugin smoke test (40 checks):** signing, replay protection, a variable product with global attributes plus categories created through references in one batch, idempotent SKU matching, conflict detection, media upload with client-made sizes and deduplication, category and media updates, export, preview (existing and unsaved products, coming-soon mode), delete.
-- **Engine integration tests (5):**
+- **Engine integration tests (6):**
   - the full cycle: pull → stage → push with images → conflict → resolve → revert from history → delta pull with remote deletion → category filter → preview;
   - the MySQL reader matching the plugin field-for-field on 1,000 products and every category;
   - the Local adapter auto-provisioning (re-activating the plugin and creating a key) and writing media directly to disk;
   - throughput;
-  - custom fields: discovery over the connector and MySQL, reading, editing, pushing and conflict detection.
+  - custom fields: discovery over the connector and MySQL, reading, editing, pushing and conflict detection;
+  - media deletion: the attachment is removed on the store and from the cache, and the product loses the image.
 - **Unit tests:** 30 engine (cache, staging and undo, history, PHP serialization, signing, Local discovery, WordPress resize geometry, WebP pipeline, clone mapping) and 16 UI logic (formula engine, import planner, bulk edits).
 - **Catalogue tests:** planning (exclusions at every level, pagination, contents page numbers, continuous flow and divider pages), text wrapping, and full PDF renders of every layout with a template, links, QR codes and bookmarks.
-- **UI end-to-end (21 steps):** grid edit and paste, undo, palette, drawer and live preview, paste cleanup, bulk edit, import with validation, variation matrix, diff panel, push, history revert, category drag-nesting, Local discovery, export, custom fields, new-product tabs, catalogue (leave out a category, change layout, cover and header text, load a template PDF, create the full PDF), dark mode.
+- **UI end-to-end (23 steps):** grid edit and paste, undo, palette, drawer and live preview, paste cleanup, bulk edit, import with validation, variation matrix, diff panel, push, history revert, category drag-nesting, Local discovery, export, custom fields, new-product tabs, catalogue (leave out a category, change layout, cover and header text, load a template PDF, create the full PDF), category tick boxes for selected products (sub-category only, with parents, untick a parent), media range select, select all, delete with undo, dark mode.
 - **Real desktop app (Tauri on Linux):** loaded 6,695 products from the test store through the connector; switched to a Local site (MySQL pull and auto-provisioning); edited in the grid; pushed with ⌘S (verified in the database); live preview inside the app.
 
 Measured on the test machine (PHP built-in server, untuned MariaDB, so real hosting will differ):
@@ -23,6 +24,12 @@ Measured on the test machine (PHP built-in server, untuned MariaDB, so real host
 | Create via connector (full WooCommerce save path, 2,000 products) | ~50 products/s (was ~25/s before the writer optimisations) |
 | Pull via connector | ~740 products/s |
 | Pull via direct MySQL / Local | ~5,800 products/s (6,695 products in 1.2 s) |
+
+## New in 0.2.1
+
+- **Category tick boxes.** Select products in the grid and every parent and sub-category in the sidebar gets a tick box: ticked (all selected products are in it), a dash (only some are) or empty. Tick to add, untick to remove, so a product put in the wrong category is fixed in one click. *Also tick parent categories* (off by default, remembered) decides whether ticking a sub-category adds its parents too; unticking only ever removes that one category, so products can sit in a parent, a sub-category, or both. The product editor's category list follows the same rules, lists the chosen categories as full paths you can remove, and marks parents that have a ticked sub-category.
+- **Media selection and bulk delete.** Click images to select them (Shift-click for a range), *Select all*, and *Delete selected*. Before deleting, CatalogForge shows which products and categories still use those images and takes the images off them in the same step, so nothing is left with a missing picture. Deletions are staged like any other change: review them, undo with ⌘Z, or Push to remove the files (and every resized copy) from the store. A *Not used* filter finds images no product or category uses.
+- **Fixed:** clicking a row's tick box in the grid logged an error.
 
 ## New in 0.2.0
 

@@ -597,6 +597,9 @@ fn apply_results(cache: &Mutex<Cache>, history_id: i64, chunk: &[PreparedOp], re
                         Entity::Category => {
                             c.conn().execute("DELETE FROM categories WHERE id = ?1", [id])?;
                         }
+                        Entity::Media => {
+                            c.conn().execute("DELETE FROM media WHERE id = ?1", [id])?;
+                        }
                         _ => {}
                     }
                     c.clear_staged(p.op.entity, &p.key, None)?;

@@ -179,20 +179,21 @@ export const useApp = create<AppState>((set, get) => ({
     const summary = await backend.remove(storeId, entity, keys);
     set({ summary, version: get().version + 1 });
     if (entity === "category") set({ taxonomy: await backend.taxonomy(storeId) });
+    if (entity === "media") set({ media: new Map((await backend.media(storeId)).map((m) => [m.id, m])) });
   },
 
   async undo() {
     const { backend, storeId } = get();
     if (!storeId) return;
     const summary = await backend.undo(storeId);
-    set({ summary, version: get().version + 1, taxonomy: await backend.taxonomy(storeId) });
+    set({ summary, version: get().version + 1, taxonomy: await backend.taxonomy(storeId), media: new Map((await backend.media(storeId)).map((m) => [m.id, m])) });
   },
 
   async discardAll() {
     const { backend, storeId } = get();
     if (!storeId) return;
     const summary = await backend.discard(storeId);
-    set({ summary, version: get().version + 1, taxonomy: await backend.taxonomy(storeId) });
+    set({ summary, version: get().version + 1, taxonomy: await backend.taxonomy(storeId), media: new Map((await backend.media(storeId)).map((m) => [m.id, m])) });
   },
 
   async pull(full = false) {

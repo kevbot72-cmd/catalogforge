@@ -25,6 +25,7 @@ export function ChangesPanel() {
   const discard = async (c: StagedChange) => {
     await backend.discard(storeId!, c.entity, c.key, c.field);
     useApp.setState({ summary: await backend.summary(storeId!), version: useApp.getState().version + 1 });
+    if (c.entity === "media") useApp.setState({ media: new Map((await backend.media(storeId!)).map((m) => [m.id, m])) });
   };
   const resolve = async (c: StagedChange, keepMine: boolean) => {
     const s = await backend.resolveConflict(storeId!, c.entity, c.key, c.field, keepMine);
