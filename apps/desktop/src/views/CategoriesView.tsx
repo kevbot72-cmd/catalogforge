@@ -24,7 +24,7 @@ function ImageSlot({ label, value, onChange }: { label: string; value: MediaValu
             <button className="text-xs text-white" onClick={async () => take(await backend.pickFiles({ multiple: false, extensions: ["jpg", "jpeg", "png", "webp"] }))}>Browse…</button>
             {!!value && <button className="text-xs text-white" onClick={() => onChange(0)}>Remove</button>}
           </div>
-          {value && typeof value !== "number" && <span className="absolute left-1.5 top-1.5 rounded bg-changed px-1.5 py-0.5 text-2xs font-medium text-black">Upload on push</span>}
+          {!!value && typeof value !== "number" && <span className="absolute left-1.5 top-1.5 rounded bg-changed px-1.5 py-0.5 text-2xs font-medium text-black">Upload on push</span>}
         </div>
       </Dropzone>
     </Field>
