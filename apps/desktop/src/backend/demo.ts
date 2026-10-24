@@ -735,6 +735,15 @@ export function createDemoBackend(): Backend {
         input.click();
       });
     },
+    async saveFile({ defaultName, bytes, mime }) {
+      // Browsers decide the folder themselves (usually Downloads).
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([bytes], { type: mime }));
+      a.download = defaultName;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+      return defaultName;
+    },
     async filesFromDrop(files) {
       return files.map((f) => ({ path: (f as File & { webkitRelativePath?: string }).webkitRelativePath || f.name, name: f.name, url: URL.createObjectURL(f), size: f.size, file: f }) as LocalFile);
     },

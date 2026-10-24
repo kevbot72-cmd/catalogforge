@@ -22,6 +22,12 @@ Measured on the test machine (PHP built-in server, untuned MariaDB, so real host
 | Pull via connector | ~740 products/s |
 | Pull via direct MySQL / Local | ~5,800 products/s (6,695 products in 1.2 s) |
 
+## Fixed in 0.1.1
+
+- **Grey/blank product images on Windows + Local.** Images written directly into a Local site were registered with an absolute disk path, because WordPress on Windows spells its uploads folder with mixed slashes, so browsers couldn't load them. The connector now always stores uploads-relative paths and **automatically repairs** images pushed by 0.1.0 the first time the updated plugin runs. Pushes now also spot-check that the store serves uploaded images, and warn with the failing URL if it doesn't.
+- **Phone photos appeared sideways.** EXIF orientation is now applied before resizing.
+- **Export** now offers Excel (.xlsx) or CSV and a native Save As dialog (choose folder and name), with selected or all products and grid or all columns.
+
 ## Known limitations
 
 - **Typing into a cell at machine speed** (e.g. a barcode scanner) can drop the first characters before the cell editor opens. Press Enter to open the editor first, or scan into the drawer's SKU/GTIN fields.

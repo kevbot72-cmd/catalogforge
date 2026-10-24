@@ -7,6 +7,7 @@ import { Badge, Button, clsx, Empty, ProgressBar, timeAgo } from "./components/u
 import { AddStoreDialog } from "./dialogs/AddStoreDialog";
 import { CloneDialog } from "./dialogs/CloneDialog";
 import { CommandPalette } from "./dialogs/CommandPalette";
+import { ExportDialog } from "./dialogs/ExportDialog";
 import { ImportWizard } from "./dialogs/ImportWizard";
 import { MassChangeDialog } from "./dialogs/MassChangeDialog";
 import { useApp } from "./store/app";
@@ -106,6 +107,7 @@ export function App() {
       </div>
       <AddStoreDialog />
       <ImportWizard />
+      <ExportDialog />
       <MassChangeDialog />
       <CloneDialog />
       <CommandPalette />

@@ -1,7 +1,7 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
-import { open } from "@tauri-apps/plugin-dialog";
+import { open, save } from "@tauri-apps/plugin-dialog";
 import type { Backend, LocalFile, Progress } from "./types";
 
 type FileInfo = { path: string; name: string; size: number };
@@ -62,6 +62,13 @@ export function createTauriBackend(): Backend {
       if (!picked) return [];
       const paths = Array.isArray(picked) ? picked : [picked];
       return (await invoke<FileInfo[]>("scan_paths", { paths })).map(toLocal);
+    },
+    async saveFile({ defaultName, filterName, extension, bytes }) {
+      const path = await save({ defaultPath: defaultName, filters: [{ name: filterName, extensions: [extension] }] });
+      if (!path) return null;
+      // Raw IPC body: no JSON encoding, so large exports stay fast.
+      await invoke("write_file", bytes, { headers: { "x-path": encodeURIComponent(path) } });
+      return path;
     },
     async filesFromDrop(files) {
       // Native drops arrive through the cf-native-drop bridge; HTML5 File objects have no path here.

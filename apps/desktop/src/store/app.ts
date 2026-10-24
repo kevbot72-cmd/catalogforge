@@ -2,7 +2,7 @@ import { create } from "zustand";
 import type { Backend, Edit, Entity, Media, ProductQuery, Progress, StagedSummary, StoreInfo, StoreProfile, TaxonomyData } from "../backend/types";
 
 export type View = "products" | "categories" | "media" | "history" | "settings";
-export type Dialog = null | "add-store" | "import" | "mass-change" | "clone" | "variations" | "palette";
+export type Dialog = null | "add-store" | "import" | "export" | "mass-change" | "clone" | "variations" | "palette";
 
 export interface Toast {
   id: number;
@@ -218,6 +218,7 @@ export const useApp = create<AppState>((set, get) => ({
         body: `${r.created} created · ${r.updated} updated · ${r.deleted} deleted${media} · ${(r.elapsed_ms / 1000).toFixed(1)}s${r.errors[0] ? ` — ${r.errors[0].label}: ${r.errors[0].message}` : ""}`,
       });
       if (!ok) set({ changesOpen: true });
+      for (const w of (r.warnings ?? []).slice(0, 2)) get().toast({ tone: "error", title: "Images may not display on the store", body: w });
     } catch (e) {
       get().toast({ tone: "error", title: "Push failed", body: String(e) });
     } finally {

@@ -215,10 +215,24 @@ fn encode(img: &DynamicImage, format: OutputFormat, source: Option<ImageFormat>,
     }
 }
 
+/// Decodes an image and applies its EXIF orientation, so phone photos stored sideways come out upright
+/// (the re-encoded file carries no EXIF, so browsers would otherwise show them rotated).
+fn decode_upright(source: &[u8]) -> Result<DynamicImage> {
+    use image::ImageDecoder;
+    let mut decoder = image::ImageReader::new(std::io::Cursor::new(source))
+        .with_guessed_format()?
+        .into_decoder()
+        .context("Unsupported or corrupt image")?;
+    let orientation = decoder.orientation().unwrap_or(image::metadata::Orientation::NoTransforms);
+    let mut img = DynamicImage::from_decoder(decoder).context("Unsupported or corrupt image")?;
+    img.apply_orientation(orientation);
+    Ok(img)
+}
+
 /// Prepares one image from raw bytes. `stem` is the already-rendered file name without extension.
 pub fn prepare(source: &[u8], stem: &str, sizes: &[ImageSize], settings: &MediaSettings) -> Result<PreparedImage> {
     let source_format = image::guess_format(source).ok();
-    let mut img = image::load_from_memory(source).context("Unsupported or corrupt image")?;
+    let mut img = decode_upright(source)?;
     let (w, h) = img.dimensions();
     if settings.max_dimension > 0 && (w > settings.max_dimension || h > settings.max_dimension) {
         let (nw, nh) = constrain(w, h, settings.max_dimension, settings.max_dimension);
@@ -353,6 +367,27 @@ mod tests {
         // deterministic → server-side de-duplication works across re-imports
         let again = prepare(src.get_ref(), "red-shoe", &sizes, &MediaSettings::default()).unwrap();
         assert_eq!(again.sha256, out.sha256);
+    }
+
+    #[test]
+    fn applies_exif_orientation() {
+        // A 300x200 landscape picture stored rotated (200x300) with EXIF orientation 6 (rotate 90° CW).
+        let landscape = image::RgbImage::from_fn(300, 200, |x, _| if x < 150 { image::Rgb([255, 0, 0]) } else { image::Rgb([0, 0, 255]) });
+        let stored = DynamicImage::ImageRgb8(landscape).rotate270();
+        let mut jpeg = Vec::new();
+        image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg, 95).encode_image(&stored).unwrap();
+        // Insert an APP1/EXIF segment with Orientation = 6 right after SOI.
+        let tiff: Vec<u8> = [b"MM\0\x2a\0\0\0\x08".as_slice(), &[0, 1], &[0x01, 0x12, 0, 3, 0, 0, 0, 1, 0, 6, 0, 0], &[0, 0, 0, 0]].concat();
+        let mut app1 = b"Exif\0\0".to_vec();
+        app1.extend(&tiff);
+        let mut with_exif = vec![0xFF, 0xD8, 0xFF, 0xE1];
+        with_exif.extend(((app1.len() + 2) as u16).to_be_bytes());
+        with_exif.extend(&app1);
+        with_exif.extend(&jpeg[2..]);
+        let out = prepare(&with_exif, "phone", &[], &MediaSettings { format: OutputFormat::Jpeg, ..Default::default() }).unwrap();
+        assert_eq!((out.width, out.height), (300, 200), "should be upright landscape");
+        let decoded = image::load_from_memory(&out.bytes).unwrap().to_rgb8();
+        assert!(decoded.get_pixel(20, 100)[0] > 200, "left half should be red after rotation");
     }
 
     #[test]

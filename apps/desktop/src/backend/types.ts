@@ -263,6 +263,7 @@ export interface PushReport {
   media_deduplicated: number;
   media_bytes: number;
   errors: PushError[];
+  warnings?: string[];
   history_id: number | null;
   elapsed_ms: number;
 }
@@ -394,6 +395,8 @@ export interface Backend {
   preview(id: string, productId: number | null, draft: Record<string, unknown>): Promise<string>;
   cloneProducts(src: string, dst: string, ids: number[], opts: CloneOptions): Promise<CloneReport>;
   pickFiles(opts: { directory?: boolean; multiple?: boolean; extensions?: string[] }): Promise<LocalFile[]>;
+  /** Asks where to save, then writes the bytes. Resolves to the saved path/name, or null if cancelled. */
+  saveFile(opts: { defaultName: string; filterName: string; extension: string; bytes: Uint8Array; mime: string }): Promise<string | null>;
   /** Turns files dropped on the window into LocalFiles (paths on desktop, object URLs in the browser). */
   filesFromDrop(files: File[]): Promise<LocalFile[]>;
   getMediaSettings(): Promise<MediaSettings>;

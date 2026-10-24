@@ -55,6 +55,8 @@ pub struct PushReport {
     pub media_deduplicated: usize,
     pub media_bytes: usize,
     pub errors: Vec<PushError>,
+    /// Non-fatal problems, e.g. uploaded images the store cannot serve.
+    pub warnings: Vec<String>,
     pub history_id: Option<i64>,
     pub elapsed_ms: u128,
 }
@@ -274,6 +276,7 @@ async fn resolve_media(driver: &dyn Driver, cache: &Mutex<Cache>, settings: &Med
         .await;
 
     let mut map: HashMap<String, i64> = HashMap::new();
+    let mut to_verify: Vec<Media> = Vec::new();
     for (id, res, size) in results {
         match res {
             Ok(up) => {
@@ -285,10 +288,14 @@ async fn resolve_media(driver: &dyn Driver, cache: &Mutex<Cache>, settings: &Med
                 }
                 cache.lock().unwrap().upsert_media(std::slice::from_ref(&up.media))?;
                 map.insert(id, up.media.id);
+                if to_verify.len() < 3 {
+                    to_verify.push(up.media.clone());
+                }
             }
             Err(e) => report.errors.push(PushError { entity: Some(Entity::Media), key: id.clone(), label: id.split_once(':').map(|x| x.1.to_string()).unwrap_or(id), message: e.to_string() }),
         }
     }
+    report.warnings.extend(verify_served(&to_verify).await);
     // Swap references for ids directly in the staging table (not an undoable user edit).
     let c = cache.lock().unwrap();
     let mut stmt = c.conn().prepare("SELECT rowid, field, value FROM staged")?;
@@ -317,6 +324,40 @@ async fn resolve_media(driver: &dyn Driver, cache: &Mutex<Cache>, settings: &Med
         }
     }
     Ok(())
+}
+
+/// Spot-checks that the store actually serves uploaded images, so a broken upload path shows up as a
+/// clear warning instead of grey placeholders on the storefront.
+async fn verify_served(media: &[Media]) -> Vec<String> {
+    let Ok(client) = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(15))
+        // Local sites commonly use self-signed certificates; this is a read-only check.
+        .danger_accept_invalid_certs(true)
+        .build()
+    else {
+        return vec![];
+    };
+    let mut out = Vec::new();
+    for m in media {
+        for url in [&m.url, &m.thumb_url] {
+            if url.is_empty() {
+                continue;
+            }
+            let problem = match client.get(url.as_str()).send().await {
+                Ok(r) if r.status().is_success() => {
+                    let ctype = r.headers().get(reqwest::header::CONTENT_TYPE).and_then(|v| v.to_str().ok()).unwrap_or("").to_string();
+                    if ctype.starts_with("image/") { None } else { Some(format!("returned {ctype} instead of an image")) }
+                }
+                Ok(r) => Some(format!("returned HTTP {}", r.status().as_u16())),
+                Err(e) => Some(format!("could not be fetched ({e})")),
+            };
+            if let Some(p) = problem {
+                out.push(format!("Image #{} was uploaded but {url} {p}. Products using it will show a blank image until this is fixed.", m.id));
+                break;
+            }
+        }
+    }
+    out
 }
 
 fn build_ops(cache: &Cache, url_media: bool) -> Result<Vec<PreparedOp>> {
@@ -782,6 +823,14 @@ pub fn clone_products(src: &Cache, src_store: &str, dst: &mut Cache, ids: &[i64]
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn unreachable_images_produce_warnings() {
+        let m = Media { id: 7, url: "http://127.0.0.1:9/wp-content/uploads/x.webp".into(), ..Default::default() };
+        let w = verify_served(&[m]).await;
+        assert_eq!(w.len(), 1);
+        assert!(w[0].contains("Image #7") && w[0].contains("blank image"), "{}", w[0]);
+    }
 
     #[test]
     fn wire_refs() {

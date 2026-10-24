@@ -103,6 +103,7 @@ class CF_Media {
 		$filename = wp_unique_filename( $uploads['path'], $base . '.' . $ext );
 		$stem     = pathinfo( $filename, PATHINFO_FILENAME );
 		$full     = trailingslashit( $uploads['path'] ) . $filename;
+		$relative = self::relative( ltrim( (string) $uploads['subdir'], '/\\' ) . '/' . $filename );
 
 		if ( false === file_put_contents( $full, $parts['full']['bytes'] ) ) {
 			return new WP_Error( 'cf_write', 'Could not write to the uploads directory.', array( 'status' => 500 ) );
@@ -130,7 +131,7 @@ class CF_Media {
 			);
 		}
 
-		$id = self::insert_attachment( $full, $check['type'], $manifest );
+		$id = self::insert_attachment( $full, $relative, $check['type'], $manifest );
 		if ( is_wp_error( $id ) ) {
 			return $id;
 		}
@@ -140,7 +141,7 @@ class CF_Media {
 				array(
 					'width'      => $parts['full']['width'],
 					'height'     => $parts['full']['height'],
-					'file'       => _wp_relative_upload_path( $full ),
+					'file'       => $relative,
 					'filesize'   => strlen( $parts['full']['bytes'] ),
 					'sizes'      => $sizes,
 					'image_meta' => array(),
@@ -167,17 +168,23 @@ class CF_Media {
 		if ( $existing = self::find_by_sha( $sha ) ) {
 			return array( 'deduplicated' => true, 'media' => CF_Serializer::media( $existing ) );
 		}
-		$uploads = wp_upload_dir( null, false );
+		$uploads  = wp_upload_dir( null, false );
+		$relative = self::relative( (string) ( $data['relative_path'] ?? '' ) );
+		// realpath() is only used for the containment check. The stored path must use WordPress's own
+		// spelling of the uploads folder: on Windows realpath() returns "C:\\…\\uploads\\…" while WordPress
+		// uses "C:\\…\\public/wp-content/uploads", and a mismatch makes WordPress store an absolute path
+		// that no browser can load (the image shows as an empty grey box).
 		$basedir = realpath( $uploads['basedir'] );
-		$full    = realpath( trailingslashit( $uploads['basedir'] ) . ltrim( (string) ( $data['relative_path'] ?? '' ), '/' ) );
-		if ( ! $basedir || ! $full || 0 !== strpos( $full, $basedir . DIRECTORY_SEPARATOR ) || ! is_file( $full ) ) {
+		$real    = realpath( trailingslashit( $uploads['basedir'] ) . $relative );
+		if ( '' === $relative || ! $basedir || ! $real || 0 !== strpos( $real, $basedir . DIRECTORY_SEPARATOR ) || ! is_file( $real ) ) {
 			return new WP_Error( 'cf_path', 'File not found inside the uploads directory.', array( 'status' => 404 ) );
 		}
+		$full = trailingslashit( $uploads['basedir'] ) . $relative;
 		$check = wp_check_filetype_and_ext( $full, basename( $full ) );
 		if ( empty( $check['type'] ) || ! isset( self::ALLOWED[ $check['type'] ] ) ) {
 			return new WP_Error( 'cf_mime', 'File is not an allowed image.', array( 'status' => 415 ) );
 		}
-		$dir   = dirname( $full );
+		$dir   = dirname( $real );
 		$sizes = array();
 		foreach ( (array) ( $data['sizes'] ?? array() ) as $s ) {
 			$file = basename( (string) ( $s['file'] ?? '' ) );
@@ -192,7 +199,7 @@ class CF_Media {
 				'filesize'  => (int) filesize( $dir . DIRECTORY_SEPARATOR . $file ),
 			);
 		}
-		$id = self::insert_attachment( $full, $check['type'], $data );
+		$id = self::insert_attachment( $full, $relative, $check['type'], $data );
 		if ( is_wp_error( $id ) ) {
 			return $id;
 		}
@@ -202,8 +209,8 @@ class CF_Media {
 				array(
 					'width'      => (int) ( $data['width'] ?? 0 ),
 					'height'     => (int) ( $data['height'] ?? 0 ),
-					'file'       => _wp_relative_upload_path( $full ),
-					'filesize'   => (int) filesize( $full ),
+					'file'       => $relative,
+					'filesize'   => (int) filesize( $real ),
 					'sizes'      => $sizes,
 					'image_meta' => array(),
 				)
@@ -259,7 +266,19 @@ class CF_Media {
 		return array( 'deduplicated' => false, 'media' => CF_Serializer::media( $id ) );
 	}
 
-	private static function insert_attachment( $full, $mime, array $data ) {
+	/** Uploads-relative path with forward slashes and no traversal segments. */
+	private static function relative( $path ) {
+		$parts = array();
+		foreach ( explode( '/', str_replace( '\\', '/', $path ) ) as $seg ) {
+			if ( '' === $seg || '.' === $seg || '..' === $seg ) {
+				continue;
+			}
+			$parts[] = $seg;
+		}
+		return implode( '/', $parts );
+	}
+
+	private static function insert_attachment( $full, $relative, $mime, array $data ) {
 		$title = isset( $data['title'] ) && '' !== $data['title'] ? sanitize_text_field( $data['title'] ) : preg_replace( '/\.[^.]+$/', '', wp_basename( $full ) );
 		$id    = wp_insert_attachment(
 			array(
@@ -267,16 +286,84 @@ class CF_Media {
 				'post_title'     => $title,
 				'post_excerpt'   => isset( $data['caption'] ) ? wp_kses_post( $data['caption'] ) : '',
 				'post_status'    => 'inherit',
-				'guid'           => trailingslashit( wp_upload_dir( null, false )['baseurl'] ) . _wp_relative_upload_path( $full ),
+				'guid'           => trailingslashit( wp_upload_dir( null, false )['baseurl'] ) . $relative,
 			),
 			$full,
 			(int) ( $data['parent_id'] ?? 0 ),
 			true
 		);
 		if ( ! is_wp_error( $id ) ) {
+			// Never trust _wp_relative_upload_path() here (see register()).
+			update_post_meta( $id, '_wp_attached_file', $relative );
 			self::apply_text( $id, $data, false );
 		}
 		return $id;
+	}
+
+	/**
+	 * Repairs attachments created by connector 0.1.0 on Windows, whose file path was stored as an
+	 * absolute disk path. Runs once per site after an update; safe to run again.
+	 *
+	 * @return int Number of attachments repaired.
+	 */
+	public static function repair_paths() {
+		global $wpdb;
+		$rows = $wpdb->get_results(
+			"SELECT f.post_id, f.meta_value FROM {$wpdb->postmeta} f
+			 INNER JOIN {$wpdb->postmeta} s ON s.post_id = f.post_id AND s.meta_key = '_cf_sha256'
+			 WHERE f.meta_key = '_wp_attached_file' AND (f.meta_value LIKE '/%' OR f.meta_value LIKE '_:%')"
+		);
+		if ( ! $rows ) {
+			return 0;
+		}
+		$uploads  = wp_upload_dir( null, false );
+		$prefixes = array_filter(
+			array(
+				trailingslashit( wp_normalize_path( $uploads['basedir'] ) ),
+				trailingslashit( wp_normalize_path( (string) realpath( $uploads['basedir'] ) ) ),
+			),
+			static function ( $p ) {
+				return '/' !== $p;
+			}
+		);
+		$fixed = 0;
+		foreach ( $rows as $row ) {
+			$abs      = wp_normalize_path( $row->meta_value );
+			$relative = '';
+			foreach ( $prefixes as $prefix ) {
+				if ( 0 === stripos( $abs, $prefix ) ) {
+					$relative = substr( $abs, strlen( $prefix ) );
+					break;
+				}
+			}
+			if ( '' === $relative && false !== ( $pos = strpos( $abs, '/wp-content/uploads/' ) ) ) {
+				$relative = substr( $abs, $pos + strlen( '/wp-content/uploads/' ) );
+			}
+			$relative = self::relative( $relative );
+			if ( '' === $relative ) {
+				continue;
+			}
+			$id = (int) $row->post_id;
+			update_post_meta( $id, '_wp_attached_file', $relative );
+			$meta = wp_get_attachment_metadata( $id );
+			if ( is_array( $meta ) ) {
+				$meta['file'] = $relative;
+				wp_update_attachment_metadata( $id, $meta );
+			}
+			$wpdb->update( $wpdb->posts, array( 'guid' => trailingslashit( $uploads['baseurl'] ) . $relative ), array( 'ID' => $id ) );
+			clean_post_cache( $id );
+			$fixed++;
+		}
+		return $fixed;
+	}
+
+	/** Runs one-time data upgrades when the plugin version changes. */
+	public static function maybe_upgrade() {
+		if ( (int) get_option( 'catalogforge_schema', 1 ) >= 2 ) {
+			return;
+		}
+		self::repair_paths();
+		update_option( 'catalogforge_schema', 2, true );
 	}
 
 	private static function apply_text( $id, array $data, $with_title ) {

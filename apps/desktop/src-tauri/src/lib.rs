@@ -421,6 +421,40 @@ fn read_file(path: String) -> CmdResult<tauri::ipc::Response> {
     std::fs::read(&path).map(tauri::ipc::Response::new).map_err(err)
 }
 
+/// Writes an export chosen through the Save dialog. The file bytes arrive as the raw request body
+/// and the destination path in the `x-path` header.
+#[tauri::command]
+fn write_file(request: tauri::ipc::Request<'_>) -> CmdResult<()> {
+    let path = request
+        .headers()
+        .get("x-path")
+        .and_then(|v| v.to_str().ok())
+        .map(|p| percent_decode(p))
+        .ok_or("Missing destination path")?;
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
+        return Err("Expected raw file bytes".into());
+    };
+    std::fs::write(&path, bytes).map_err(|e| format!("Could not save {path}: {e}"))
+}
+
+fn percent_decode(s: &str) -> String {
+    let b = s.as_bytes();
+    let mut out = Vec::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        if b[i] == b'%' && i + 2 < b.len() {
+            if let Ok(v) = u8::from_str_radix(&s[i + 1..i + 3], 16) {
+                out.push(v);
+                i += 3;
+                continue;
+            }
+        }
+        out.push(b[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
 #[tauri::command]
 fn get_media_settings(state: State<'_, AppState>) -> MediaSettings {
     state.settings.lock().unwrap().clone()
@@ -431,6 +465,18 @@ fn set_media_settings(state: State<'_, AppState>, settings: MediaSettings) -> Cm
     std::fs::write(state.data_dir.join("media-settings.json"), serde_json::to_vec_pretty(&settings).map_err(err)?).map_err(err)?;
     *state.settings.lock().unwrap() = settings;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn decodes_encoded_paths() {
+        // encodeURIComponent("C:\\Users\\kevbo\\Documents\\products é.xlsx")
+        assert_eq!(super::percent_decode("C%3A%5CUsers%5Ckevbo%5CDocuments%5Cproducts%20%C3%A9.xlsx"), "C:\\Users\\kevbo\\Documents\\products é.xlsx");
+        assert_eq!(super::percent_decode("/Users/kev/a%2Bb.csv"), "/Users/kev/a+b.csv");
+        assert_eq!(super::percent_decode(""), "");
+        assert_eq!(super::percent_decode("50%"), "50%");
+    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -460,7 +506,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             list_stores, add_store, remove_store, local_sites, start_local_site, open_store, pull, query, rows, skus, variations, taxonomy, media, stage, create,
             remove, undo, discard, summary, changes, resolve_conflict, push, history, history_items, revert, preview, clone_products, scan_paths,
-            read_file, get_media_settings, set_media_settings
+            read_file, write_file, get_media_settings, set_media_settings
         ])
         .run(tauri::generate_context!())
         .expect("error while running CatalogForge");

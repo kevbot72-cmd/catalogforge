@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       CatalogForge Connector
  * Description:       High-throughput, signed bridge between the CatalogForge desktop app and this WooCommerce store: bulk catalog export, bulk upserts through WooCommerce CRUD with deferred housekeeping, zero-CPU media ingestion, and theme-accurate live previews.
- * Version:           0.1.0
+ * Version:           0.1.1
  * Requires at least: 6.2
  * Requires PHP:      7.4
  * Author:            CatalogForge
@@ -15,7 +15,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'CATALOGFORGE_VERSION', '0.1.0' );
+define( 'CATALOGFORGE_VERSION', '0.1.1' );
 define( 'CATALOGFORGE_PROTOCOL', 1 );
 define( 'CATALOGFORGE_DIR', __DIR__ );
 
@@ -39,6 +39,7 @@ add_action(
 
 add_action( 'rest_api_init', array( 'CF_Api', 'register_routes' ) );
 add_action( 'init', array( 'CF_Preview', 'init' ) );
+add_action( 'init', array( 'CF_Media', 'maybe_upgrade' ), 20 );
 
 if ( is_admin() ) {
 	CF_Admin::init();

@@ -107,6 +107,7 @@ async fn full_cycle_pull_stage_push_conflict_revert() {
     assert!(report.errors.is_empty(), "{:?}", report.errors);
     assert_eq!(report.created, 7);
     assert_eq!(report.media_uploaded, 2, "the same file used twice is uploaded once: {report:?}");
+    assert!(report.warnings.is_empty(), "uploaded images must be served by the store: {:?}", report.warnings);
     assert_eq!(cache.lock().unwrap().summary().unwrap().created, 0);
 
     // --- the cache now holds server records with real ids
@@ -277,6 +278,17 @@ async fn local_adapter_provisions_and_writes_media_to_disk() {
     assert!(!up.deduplicated);
     let rel = up.media.url.split("/wp-content/uploads/").nth(1).unwrap().to_string();
     assert!(std::path::Path::new(&wp_root).join("wp-content/uploads").join(&rel).exists());
+    // The stored path must be relative to uploads: WordPress builds every image URL from it, and an
+    // absolute disk path (the Windows bug) yields a grey, unloadable image.
+    let attached: String = sqlx::query_scalar("SELECT meta_value FROM wp_postmeta WHERE post_id = ? AND meta_key = '_wp_attached_file'")
+        .bind(up.media.id)
+        .fetch_one(my.pool())
+        .await
+        .unwrap();
+    assert_eq!(attached, rel, "stored path must be uploads-relative");
+    let via_db = my.media_for(&[up.media.id]).await.unwrap();
+    assert_eq!(via_db[0].url, up.media.url);
+    assert_eq!(via_db[0].thumb_url, up.media.thumb_url);
     let again = driver.upload_media(&prepared, &Default::default()).await.unwrap();
     assert!(again.deduplicated);
     assert_eq!(again.media.id, up.media.id);

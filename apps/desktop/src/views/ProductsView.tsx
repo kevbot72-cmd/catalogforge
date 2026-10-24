@@ -13,7 +13,7 @@ function Chip({ active, onClick, children, testId }: { active: boolean; onClick:
 }
 
 export function ProductsView() {
-  const { query, setQuery, selection, openDialog, create, openDrawer, remove, summary, undo, pull, info, toast } = useApp();
+  const { query, setQuery, selection, openDialog, create, openDrawer, remove, summary, undo, pull, info } = useApp();
   const [search, setSearch] = useState(query.search ?? "");
   const [preset, setPreset] = useState<string>(() => {
     try {
@@ -55,24 +55,6 @@ export function ProductsView() {
     } catch {
       /* ignore */
     }
-  };
-
-  const exportCsv = async () => {
-    const { backend, storeId } = useApp.getState();
-    if (!storeId) return;
-    const res = await backend.query(storeId, query);
-    const rows = await backend.rows(storeId, selection.length ? selection : res.keys);
-    const cols = columns.filter((c) => !["_expand", "image_id"].includes(c.id));
-    const esc = (v: unknown) => {
-      const s = Array.isArray(v) ? v.join("|") : v === null || v === undefined ? "" : String(v);
-      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-    };
-    const csv = [cols.map((c) => c.title || c.id).join(","), ...rows.map((r) => cols.map((c) => esc((r as Record<string, unknown>)[c.id])).join(","))].join("\n");
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
-    a.download = `products-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    toast({ tone: "success", title: `Exported ${rows.length} rows` });
   };
 
   return (
@@ -123,7 +105,7 @@ export function ProductsView() {
         </div>
         <Button size="sm" variant="ghost" icon={<RefreshCw size={14} />} onClick={() => pull(false)} title={`Sync from store · last ${info?.last_pull ? new Date(info.last_pull * 1000).toLocaleTimeString() : "never"}`}>Sync</Button>
         <Button size="sm" variant="ghost" icon={<Undo2 size={14} />} disabled={!summary.can_undo} onClick={undo} title="Undo last change (⌘Z)" data-testid="undo">Undo</Button>
-        <Button size="sm" icon={<Download size={14} />} onClick={exportCsv} title="Export the current view (or selection) to CSV">Export</Button>
+        <Button size="sm" icon={<Download size={14} />} onClick={() => openDialog("export")} title="Export to Excel or CSV" data-testid="open-export">Export{selection.length ? ` (${selection.length})` : ""}</Button>
         <Button size="sm" icon={<FileUp size={14} />} onClick={() => openDialog("import")} data-testid="open-import">Import</Button>
         <Button size="sm" icon={<Sparkles size={14} />} onClick={() => openDialog("mass-change")} data-testid="open-mass-change">Bulk edit{selection.length ? ` (${selection.length})` : ""}</Button>
         {selection.length > 0 && (

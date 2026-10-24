@@ -242,6 +242,20 @@ await step("add store: Local sites are discovered", async () => {
   await page.keyboard.press("Escape");
 });
 
+await step("export: dialog offers Excel/CSV and downloads a valid workbook", async () => {
+  await page.getByTestId("nav-products").click();
+  await page.getByTestId("open-export").click();
+  await page.getByTestId("export-dialog").waitFor();
+  await page.getByTestId("export-xlsx").click();
+  const [download] = await Promise.all([page.waitForEvent("download"), page.getByTestId("export-save").click()]);
+  expect(/\.xlsx$/.test(download.suggestedFilename()), `unexpected file name ${download.suggestedFilename()}`);
+  const path = await download.path();
+  const { readFileSync } = await import("node:fs");
+  const bytes = readFileSync(path);
+  expect(bytes[0] === 0x50 && bytes[1] === 0x4b, "xlsx should be a zip container");
+  await shot("15-export");
+});
+
 await step("dark mode", async () => {
   await page.getByTestId("nav-products").click();
   await page.getByLabel("Toggle dark mode").click();
