@@ -34,6 +34,11 @@ export function CommandPalette() {
     return () => window.removeEventListener("keydown", h);
   }, [open, openDialog]);
 
+  // Always open with an empty query.
+  useEffect(() => {
+    if (!open) setQ("");
+  }, [open]);
+
   useEffect(() => {
     if (!open || q.length < 2 || !app.storeId) return setHits([]);
     let cancelled = false;
@@ -89,7 +94,12 @@ export function CommandPalette() {
   const group = "px-1 py-1 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1 [&_[cmdk-group-heading]]:text-2xs [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:text-muted";
   return createPortal(
     <div className="fixed inset-0 flex items-start justify-center bg-black/30 pt-[14vh]" onMouseDown={(e) => e.target === e.currentTarget && openDialog(null)}>
-      <Command label="Command palette" className="w-[620px] overflow-hidden rounded-xl border border-line bg-panel shadow-2xl" data-testid="palette">
+      <Command label="Command palette" className="w-[620px] overflow-hidden rounded-xl border border-line bg-panel shadow-2xl" data-testid="palette" onKeyDown={(e) => {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          openDialog(null);
+        }
+      }}>
         <Command.Input value={q} onValueChange={setQ} autoFocus placeholder="Type a command or search products…" className="h-12 w-full border-b border-line bg-transparent px-4 text-[14px] focus:outline-none" />
         <Command.List className="max-h-[420px] overflow-auto p-1">
           <Command.Empty className="p-4 text-center text-muted">No results</Command.Empty>

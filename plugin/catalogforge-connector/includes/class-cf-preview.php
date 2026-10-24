@@ -85,6 +85,8 @@ class CF_Preview {
 		add_action( 'template_redirect', array( __CLASS__, 'headers' ), 99 );
 		add_filter( 'wp_robots', 'wp_robots_no_robots' );
 		add_filter( 'redirect_canonical', '__return_false' );
+		// Stores under construction (WooCommerce "coming soon" mode) must still preview for the merchant.
+		add_filter( 'woocommerce_coming_soon_exclude', '__return_true' );
 
 		$props = array(
 			'name', 'sku', 'regular_price', 'sale_price', 'description', 'short_description',

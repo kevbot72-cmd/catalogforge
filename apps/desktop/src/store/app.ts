@@ -58,6 +58,7 @@ interface AppState {
 }
 
 let toastId = 0;
+let initStarted = false;
 
 export const useApp = create<AppState>((set, get) => ({
   backend: null as unknown as Backend,
@@ -81,6 +82,9 @@ export const useApp = create<AppState>((set, get) => ({
   dark: false,
 
   async init() {
+    // Idempotent: React StrictMode runs mount effects twice in development.
+    if (initStarted) return;
+    initStarted = true;
     const { backend } = get();
     backend.onProgress((id, p) => {
       if (id === get().storeId) set({ progress: p.phase === "done" ? null : p });

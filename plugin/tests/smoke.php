@@ -167,6 +167,7 @@ check( 'preview url issued', ! empty( $pv['url'] ) );
 $html = file_get_contents( $pv['url'] );
 check( 'preview renders draft title through theme', false !== strpos( (string) $html, "Preview Name $sfx" ) );
 check( 'preview renders draft price', false !== strpos( (string) $html, '99' ) );
+check( 'preview bypasses WooCommerce coming-soon mode', false === strpos( (string) $html, 'woocommerce-coming-soon' ) );
 check( 'preview did not persist', true );
 [ , $after ] = call( 'GET', '/catalog', array( 'ids' => (string) $by_ref['s1']['id'] ) );
 check( 'stored name unchanged', ( $after['products'][0]['name'] ?? '' ) === "Sticker $sfx" );
