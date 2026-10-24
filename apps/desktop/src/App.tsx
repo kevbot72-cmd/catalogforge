@@ -13,6 +13,8 @@ import { ImportWizard } from "./dialogs/ImportWizard";
 import { MassChangeDialog } from "./dialogs/MassChangeDialog";
 import { useApp } from "./store/app";
 import { CategoriesView } from "./views/CategoriesView";
+import { PushConfirmDialog } from "./dialogs/PushConfirmDialog";
+import { BatchBuilderView } from "./views/BatchBuilderView";
 import { CatalogueView } from "./views/CatalogueView";
 import { HistoryView } from "./views/HistoryView";
 import { MediaView } from "./views/MediaView";
@@ -103,7 +105,7 @@ export function App() {
               </Empty>
             ) : (
               <ErrorBoundary label={`${view} page`} resetKey={`${storeId}/${view}`}>
-                {view === "products" ? <ProductsView /> : view === "categories" ? <CategoriesView /> : view === "media" ? <MediaView /> : view === "catalogue" ? <CatalogueView /> : view === "history" ? <HistoryView /> : <SettingsView />}
+                {view === "products" ? <ProductsView /> : view === "categories" ? <CategoriesView /> : view === "media" ? <MediaView /> : view === "batch" ? <BatchBuilderView /> : view === "catalogue" ? <CatalogueView /> : view === "history" ? <HistoryView /> : <SettingsView />}
               </ErrorBoundary>
             )}
             {view === "products" && (
@@ -121,6 +123,7 @@ export function App() {
       <MassChangeDialog />
       <CloneDialog />
       <CommandPalette />
+      <PushConfirmDialog />
       <Toasts />
     </div>
   );

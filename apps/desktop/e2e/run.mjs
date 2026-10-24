@@ -201,7 +201,15 @@ await step("changes panel shows a reviewable diff", async () => {
 });
 
 await step("push applies everything and records history", async () => {
+  // The safety question: No leaves everything staged, Yes pushes.
   await page.getByTestId("push-panel").click();
+  await page.getByTestId("push-confirm").waitFor();
+  expect((await page.getByTestId("push-confirm").innerText()).includes("Are you sure you want to push changes?"), "asks first");
+  await shot("07b-push-confirm");
+  await page.getByTestId("push-confirm-no").click();
+  expect((await pending()) > 0, "No keeps the changes staged");
+  await page.getByTestId("push").click();
+  await page.getByTestId("push-confirm-yes").click();
   await page.getByTestId("toast").filter({ hasText: "Pushed" }).first().waitFor({ timeout: 20000 });
   expect((await pending()) === 0, "nothing should remain pending");
   await page.getByTestId("toggle-changes").click();
@@ -445,6 +453,50 @@ await step("bulk edit: paste formatted text into the short description", async (
   expect(short.includes("<strong>Built to last.</strong>") && short.includes("<ul>"), `drawer shows the formatting: ${short.slice(0, 200)}`);
   await page.getByLabel("Close drawer").click();
   await page.getByTestId("search").fill("");
+});
+
+await step("batch builder: blank × collection, matched images, add to store, continue numbering, export", async () => {
+  const { writeFileSync, readFileSync, mkdirSync: mk } = await import("node:fs");
+  const dir = `${SHOTS}batch-images/`;
+  mk(dir, { recursive: true });
+  // Tiny PNGs: three featured images and one gallery image.
+  const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+  const names = ["cat-01.png", "cat-01a.png", "cat-02.png", "cat-03.png"];
+  for (const n of names) writeFileSync(dir + n, png);
+  await page.getByTestId("nav-batch").click();
+  await page.getByTestId("batch-builder").waitFor();
+  await page.getByTestId("col-start").fill("1");
+  await page.getByTestId("col-count").fill("3");
+  expect((await page.getByTestId("batch-stats").innerText()).startsWith("3"), "three products planned");
+  const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.getByTestId("batch-pick-images").click()]);
+  await chooser.setFiles(names.map((n) => dir + n));
+  await page.getByTestId("image-slots").waitFor();
+  expect((await page.getByTestId("slot-0-0").getAttribute("aria-label")).startsWith("cat-01.png"), "matched by number");
+  expect((await page.getByTestId("slot-0-1").getAttribute("aria-label")).startsWith("cat-01a.png"), "gallery by letter");
+  // Swap products 2 and 3's featured images, then back.
+  await page.getByTestId("slot-1-0").click();
+  await page.getByTestId("slot-2-0").click();
+  expect((await page.getByTestId("slot-1-0").getAttribute("aria-label")).startsWith("cat-03.png"), "swapped");
+  await page.getByTestId("slot-1-0").click();
+  await page.getByTestId("slot-2-0").click();
+  expect((await page.getByTestId("batch-checks").innerText()).includes("3 new categories will be created: 11oz Mugs, Funny, Cats Funny"), "category path is new");
+  await shot("24-batch-builder");
+  // Export the Store Manager CSV.
+  const [download] = await Promise.all([page.waitForEvent("download"), page.getByTestId("batch-csv").click()]);
+  const csv = readFileSync(await download.path(), "utf8");
+  expect(csv.includes("CERMUG-CF01") && csv.split("\r\n")[0].includes("Product Image Gallery"), "CSV in Store Manager layout");
+  // Add to the store.
+  await page.getByTestId("batch-add").click();
+  await page.getByText(/3 products added/).waitFor();
+  await page.getByTestId("product-grid").waitFor();
+  await page.getByTestId("search").fill("CERMUG");
+  await page.waitForTimeout(700);
+  expect(Number(await page.getByTestId("product-grid").getAttribute("data-rows")) === 3, "three new products in the grid");
+  await shot("25-batch-in-grid");
+  await page.getByTestId("search").fill("");
+  // The next batch continues the numbering.
+  await page.getByTestId("nav-batch").click();
+  expect((await page.getByTestId("col-start").inputValue()) === "4", "next batch starts at 4");
 });
 
 await step("dark mode", async () => {

@@ -1,7 +1,7 @@
 {
   "name": "catalogforge-desktop",
   "private": true,
-  "version": "0.2.2",
+  "version": "0.3.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -27,6 +27,7 @@
     "@tiptap/starter-kit": "^2.10.3",
     "clsx": "^2.1.1",
     "cmdk": "^1.0.0",
+    "jszip": "^3.10.1",
     "lodash": "^4.17.21",
     "lucide-react": "^0.460.0",
     "marked": "^4.3.0",

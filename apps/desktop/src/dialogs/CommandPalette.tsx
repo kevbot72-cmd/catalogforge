@@ -120,6 +120,7 @@ export function CommandPalette() {
             <Command.Item onSelect={run(() => app.openDialog("mass-change"))} className={item}>Bulk edit…</Command.Item>
             <Command.Item onSelect={run(() => app.openDialog("export"))} className={item}>Export to Excel or CSV…</Command.Item>
             <Command.Item onSelect={run(() => app.setView("catalogue"))} className={item}>Create a catalogue PDF…</Command.Item>
+            <Command.Item onSelect={run(() => app.setView("batch"))} className={item}>Build a batch of products from a blank…</Command.Item>
             <Command.Item onSelect={run(async () => app.openDrawer((await app.create([{ entity: "product", fields: { name: "New product", type: "simple", status: "draft" } }]))[0]))} className={item}>New product</Command.Item>
             <Command.Item onSelect={run(() => app.toggleChanges(true))} className={item}>Review changes</Command.Item>
             <Command.Item onSelect={run(groupAsVariations)} className={item}>Group selected simple products as variations</Command.Item>

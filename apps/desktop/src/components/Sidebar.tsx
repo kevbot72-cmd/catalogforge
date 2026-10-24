@@ -1,4 +1,4 @@
-import { BookOpen, Boxes, ChevronDown, ChevronRight, FolderTree, History, Image as ImageIcon, Moon, Package, Plus, Settings, Sun, Tag } from "lucide-react";
+import { BookOpen, Boxes, Layers, ChevronDown, ChevronRight, FolderTree, History, Image as ImageIcon, Moon, Package, Plus, Settings, Sun, Tag } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CategoryRow, Edit, LocalFile, ProductRow } from "../backend/types";
 import { ancestorKeys, assignCategory, catKey } from "../lib/categoryAssign";
@@ -166,6 +166,7 @@ export function Sidebar() {
       <StoreSwitcher />
       <nav className="space-y-0.5 px-2 pt-2">
         <NavItem id="products" icon={<Package size={15} />} label="Products" count={info?.product_count} />
+        <NavItem id="batch" icon={<Layers size={15} />} label="Batch Builder" />
         <NavItem id="categories" icon={<FolderTree size={15} />} label="Categories" count={taxonomy?.categories.length} />
         <NavItem id="media" icon={<ImageIcon size={15} />} label="Media" count={media.size} />
         <NavItem id="catalogue" icon={<BookOpen size={15} />} label="Catalogue PDF" />

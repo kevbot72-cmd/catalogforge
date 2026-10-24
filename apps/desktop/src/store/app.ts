@@ -1,8 +1,8 @@
 import { create } from "zustand";
 import type { Backend, Edit, Entity, Media, ProductQuery, Progress, StagedSummary, StoreInfo, StoreProfile, TaxonomyData } from "../backend/types";
 
-export type View = "products" | "categories" | "media" | "catalogue" | "history" | "settings";
-export type Dialog = null | "add-store" | "import" | "export" | "mass-change" | "clone" | "variations" | "palette";
+export type View = "products" | "batch" | "categories" | "media" | "catalogue" | "history" | "settings";
+export type Dialog = null | "add-store" | "import" | "export" | "mass-change" | "clone" | "variations" | "palette" | "push-confirm";
 
 export interface Toast {
   id: number;
@@ -53,7 +53,9 @@ interface AppState {
   undo(): Promise<void>;
   discardAll(): Promise<void>;
   pull(full?: boolean): Promise<void>;
+  /** Asks "Are you sure you want to push changes?" first; pushNow runs after Yes. */
   push(label?: string): Promise<void>;
+  pushNow(label?: string): Promise<void>;
   toast(t: Omit<Toast, "id">): void;
   dismissToast(id: number): void;
   setDark(d: boolean): void;
@@ -213,6 +215,12 @@ export const useApp = create<AppState>((set, get) => ({
   },
 
   async push(label) {
+    const { summary, storeId } = get();
+    if (!storeId || summary.created + summary.modified + summary.deleted === 0) return;
+    set({ dialog: "push-confirm", dialogArg: label ?? "" });
+  },
+
+  async pushNow(label) {
     const { backend, storeId, summary } = get();
     if (!storeId) return;
     const parts = [summary.created && `${summary.created} new`, summary.modified && `${summary.modified} edited`, summary.deleted && `${summary.deleted} deleted`].filter(Boolean).join(", ");

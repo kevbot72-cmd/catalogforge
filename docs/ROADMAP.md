@@ -15,7 +15,7 @@ Tested against WordPress 6.8.3 + WooCommerce 9.9.5 on MariaDB (PHP built-in serv
   - formatted descriptions (lists, bold, colour, size) are stored by WooCommerce exactly as pushed.
 - **Unit tests:** 30 engine (cache, staging and undo, history, PHP serialization, signing, Local discovery, WordPress resize geometry, WebP pipeline, clone mapping) and 16 UI logic (formula engine, import planner, bulk edits).
 - **Catalogue tests:** planning (exclusions at every level, pagination, contents page numbers, continuous flow and divider pages), text wrapping, and full PDF renders of every layout with a template, links, QR codes and bookmarks.
-- **UI end-to-end (24 steps):** grid edit and paste, undo, palette, drawer and live preview, paste cleanup, bulk edit, import with validation, variation matrix, diff panel, push, history revert, category drag-nesting, Local discovery, export, custom fields, new-product tabs, catalogue (leave out a category, change layout, cover and header text, load a template PDF, create the full PDF), category tick boxes for selected products (sub-category only, with parents, untick a parent), media range select, select all, delete with undo, pasting Google Docs text into bulk edit, dark mode.
+- **UI end-to-end (25 steps):** grid edit and paste, undo, palette, drawer and live preview, paste cleanup, bulk edit, import with validation, variation matrix, diff panel, push, history revert, category drag-nesting, Local discovery, export, custom fields, new-product tabs, catalogue (leave out a category, change layout, cover and header text, load a template PDF, create the full PDF), category tick boxes for selected products (sub-category only, with parents, untick a parent), media range select, select all, delete with undo, pasting Google Docs text into bulk edit, push confirmation (No keeps changes staged, Yes pushes), Batch Builder (images matched and swapped, CSV export, batch added to the store, numbering continues), dark mode.
 - **Real desktop app (Tauri on Linux):** loaded 6,695 products from the test store through the connector; switched to a Local site (MySQL pull and auto-provisioning); edited in the grid; pushed with ⌘S (verified in the database); live preview inside the app.
 
 Measured on the test machine (PHP built-in server, untuned MariaDB, so real hosting will differ):
@@ -25,6 +25,18 @@ Measured on the test machine (PHP built-in server, untuned MariaDB, so real host
 | Create via connector (full WooCommerce save path, 2,000 products) | ~50 products/s (was ~25/s before the writer optimisations) |
 | Pull via connector | ~740 products/s |
 | Pull via direct MySQL / Local | ~5,800 products/s (6,695 products in 1.2 s) |
+
+## New in 0.3.0
+
+- **Batch Builder** (sidebar → Batch Builder), the Product Batch Builder rebuilt inside CatalogForge:
+  - **Blanks**: everything a collection shares, saved as you type. Make one from scratch, duplicate one, make one from **any product in your store** (prices, sizes, tags, descriptions and options are copied, prices in the text become `{price}`), import the old Store Manager CSV, or export/import all blanks as a file to use on another computer.
+  - **Options → variable products**: add Size, Colour… with a price per option where it differs; every combination becomes a variation with its own SKU.
+  - **Collections**: numbered (start, count, digits) or a list of names; category paths are picked from your store or typed (new levels are created); publish, draft or private; existing SKUs are left alone or updated.
+  - **Continues numbering**: it finds products already in the store with the same SKU pattern and offers to continue from the next free number, and after adding a batch the next one starts where it ended.
+  - **Images**: dropped or chosen from your PC, matched by the number in the file name or by file order, with featured + gallery slots per product. Click two images to swap them; place unmatched images by clicking. Shared gallery images (e.g. a size chart) go on every product and upload once.
+  - **Checks** before anything is staged, including against the store: duplicate and existing SKUs, repeated titles, zero or invalid prices, price text that doesn't match the price (with a fix: use `{price}`), broken emojis, ChatGPT `data-start` markup (one-click removal), missing categories and new ones that will be created, products without a featured image, unused images.
+  - **Add to store**: stages the whole batch (products, variations, categories, images) as one undoable step, then opens the grid on the new products. **Preview in your theme** shows the first product on your real site. **CSV** and **ZIP (CSV + renamed images)** export in the 56-column Store Manager / WP All Import layout remain for other workflows.
+- **Push confirmation**: every way of pushing (the Push button, the Changes panel, ⌘S, the command palette) now asks *"Are you sure you want to push changes?"* with the store name, what will change and a warning for live stores. *No* leaves everything staged.
 
 ## New in 0.2.2
 
@@ -64,6 +76,8 @@ Measured on the test machine (PHP built-in server, untuned MariaDB, so real host
 - **Very large imports** stage everything in one undo step. For 50k+ rows, import in chunks of ~10k.
 
 ## Next
+
+0. **Store migration (phase 2)**: a Migration section to move a whole store (categories, products, variations, images, custom fields) into a new, empty store.
 
 1. **SSH tunnel and SFTP drivers**: direct MySQL over SSH, and SFTP media upload for hosts that block HTTP uploads.
 2. **Scheduled supplier feeds**: saved import profiles run on a schedule from SFTP/HTTP/FTP, with a dry-run report before staging.

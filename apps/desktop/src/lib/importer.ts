@@ -45,6 +45,7 @@ export const FIELDS: FieldDef[] = [
   { key: "width", label: "Width", group: "Shipping", kind: "decimal", synonyms: ["width"] },
   { key: "height", label: "Height", group: "Shipping", kind: "decimal", synonyms: ["height"] },
   { key: "shipping_class", label: "Shipping class", group: "Shipping", kind: "text", synonyms: ["shipping class"] },
+  { key: "tax_class", label: "Tax class", group: "Pricing", kind: "text", synonyms: ["tax class"] },
   { key: "seo_title", label: "SEO title", group: "SEO", kind: "text", synonyms: ["seo title", "meta title", "page title"] },
   { key: "seo_description", label: "SEO description", group: "SEO", kind: "text", synonyms: ["seo description", "meta description"] },
   { key: "slug", label: "Slug", group: "SEO", kind: "text", synonyms: ["slug", "url key", "handle"] },
