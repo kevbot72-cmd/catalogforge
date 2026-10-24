@@ -2,6 +2,7 @@ import { ChevronDown, ChevronRight, FolderPlus, GripVertical, ImagePlus, Search,
 import { useMemo, useState } from "react";
 import type { CategoryRow, Edit, LocalFile, MediaValue } from "../backend/types";
 import { BufferedInput, categoryTree } from "../components/fields";
+import { CategoryProducts } from "../components/CategoryProducts";
 import { RichTextEditor } from "../components/RichTextEditor";
 import { Badge, Button, clsx, Dropzone, Empty, Field, Input, mediaUrl, Select } from "../components/ui";
 import { useApp } from "../store/app";
@@ -164,6 +165,7 @@ export function CategoriesView() {
               <Button size="sm" onClick={() => (setQuery({ category_id: typeof cat.id === "number" && cat.id > 0 ? cat.id : null }), setView("products"))}>View products</Button>
               <Button size="sm" variant="ghost" icon={<Trash2 size={14} />} onClick={() => (remove("category", [keyOf(cat)]), setSelected(null))}>Delete</Button>
             </div>
+            <CategoryProducts cat={cat} />
             <div className="grid grid-cols-2 gap-4">
               <Field label="Name" changed={cat._state.dirty.includes("name")}><BufferedInput value={cat.name} onCommit={(v) => set("name", v)} data-testid="category-name" /></Field>
               <Field label="Slug" changed={cat._state.dirty.includes("slug")}><BufferedInput value={cat.slug} onCommit={(v) => set("slug", v)} /></Field>

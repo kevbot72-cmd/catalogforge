@@ -499,6 +499,34 @@ await step("batch builder: blank × collection, matched images, add to store, co
   expect((await page.getByTestId("col-start").inputValue()) === "4", "next batch starts at 4");
 });
 
+await step("categories page: products in a category with tick boxes", async () => {
+  await page.getByTestId("nav-categories").click();
+  await page.getByTestId("cat-Home").click();
+  const box = page.getByTestId("category-products");
+  await box.waitFor();
+  await page.waitForFunction(() => !document.querySelector('[data-testid="category-products"]')?.textContent?.includes("loading"));
+  const head = async () => (await box.locator("button").first().innerText());
+  expect((await head()).includes("0 directly") && (await head()).includes("only in sub-categories"), `parent shows sub-category products: ${await head()}`);
+  expect((await box.innerText()).includes("in Mugs"), "rows say which sub-category");
+  const first = box.locator('input[type="checkbox"][data-testid^="catprod-"]').first();
+  await first.check();
+  await page.waitForTimeout(400);
+  expect((await head()).startsWith("Products in this category") && (await head()).includes("1 directly"), `ticked into the parent: ${await head()}`);
+  await first.uncheck();
+  await page.waitForTimeout(400);
+  expect((await head()).includes("0 directly"), "unticked again");
+  // Add a product from elsewhere in the store.
+  await page.getByTestId("category-add-products").click();
+  await page.getByTestId("category-add-search").fill("Alpine");
+  await page.waitForTimeout(600);
+  await page.getByTestId("category-add-dialog").locator('input[type="checkbox"]:not(:checked)').first().check();
+  await page.waitForTimeout(300);
+  await page.getByRole("button", { name: "Done" }).click();
+  await page.waitForTimeout(400);
+  expect((await head()).includes("1 directly"), `added from the store: ${await head()}`);
+  await shot("26-category-products");
+});
+
 await step("dark mode", async () => {
   await page.getByTestId("nav-products").click();
   await page.getByLabel("Toggle dark mode").click();

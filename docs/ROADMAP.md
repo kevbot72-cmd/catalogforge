@@ -15,7 +15,7 @@ Tested against WordPress 6.8.3 + WooCommerce 9.9.5 on MariaDB (PHP built-in serv
   - formatted descriptions (lists, bold, colour, size) are stored by WooCommerce exactly as pushed.
 - **Unit tests:** 30 engine (cache, staging and undo, history, PHP serialization, signing, Local discovery, WordPress resize geometry, WebP pipeline, clone mapping) and 16 UI logic (formula engine, import planner, bulk edits).
 - **Catalogue tests:** planning (exclusions at every level, pagination, contents page numbers, continuous flow and divider pages), text wrapping, and full PDF renders of every layout with a template, links, QR codes and bookmarks.
-- **UI end-to-end (25 steps):** grid edit and paste, undo, palette, drawer and live preview, paste cleanup, bulk edit, import with validation, variation matrix, diff panel, push, history revert, category drag-nesting, Local discovery, export, custom fields, new-product tabs, catalogue (leave out a category, change layout, cover and header text, load a template PDF, create the full PDF), category tick boxes for selected products (sub-category only, with parents, untick a parent), media range select, select all, delete with undo, pasting Google Docs text into bulk edit, push confirmation (No keeps changes staged, Yes pushes), Batch Builder (images matched and swapped, CSV export, batch added to the store, numbering continues), dark mode.
+- **UI end-to-end (26 steps):** grid edit and paste, undo, palette, drawer and live preview, paste cleanup, bulk edit, import with validation, variation matrix, diff panel, push, history revert, category drag-nesting, Local discovery, export, custom fields, new-product tabs, catalogue (leave out a category, change layout, cover and header text, load a template PDF, create the full PDF), category tick boxes for selected products (sub-category only, with parents, untick a parent), media range select, select all, delete with undo, pasting Google Docs text into bulk edit, push confirmation (No keeps changes staged, Yes pushes), Batch Builder (images matched and swapped, CSV export, batch added to the store, numbering continues), products in a category with tick boxes (sub-category products, tick, untick, add from the store), dark mode.
 - **Real desktop app (Tauri on Linux):** loaded 6,695 products from the test store through the connector; switched to a Local site (MySQL pull and auto-provisioning); edited in the grid; pushed with ⌘S (verified in the database); live preview inside the app.
 
 Measured on the test machine (PHP built-in server, untuned MariaDB, so real hosting will differ):
@@ -25,6 +25,12 @@ Measured on the test machine (PHP built-in server, untuned MariaDB, so real host
 | Create via connector (full WooCommerce save path, 2,000 products) | ~50 products/s (was ~25/s before the writer optimisations) |
 | Pull via connector | ~740 products/s |
 | Pull via direct MySQL / Local | ~5,800 products/s (6,695 products in 1.2 s) |
+
+## New in 0.3.1
+
+- **Products in each category (Categories page).** Selecting a category shows its products with tick boxes: untick to take a product out of that category, tick to put it back, and *Add products…* to tick in products from anywhere in the store. Products that sit only in a sub-category are listed too (labelled “in Mugs”, for example), so you can see and fix products placed in a parent or a sub-category by mistake. A product's other categories are never touched, and *Ticking also ticks this category's parents* follows the same remembered setting as everywhere else.
+- **Changes panel shows category names** instead of numbers for product categories and category parents.
+- **Fixed:** a stray “0” in an empty category banner box.
 
 ## New in 0.3.0
 

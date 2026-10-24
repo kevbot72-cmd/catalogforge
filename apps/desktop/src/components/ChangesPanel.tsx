@@ -5,7 +5,7 @@ import { fieldLabel, useApp } from "../store/app";
 import { Badge, Button, clsx, formatValue } from "./ui";
 
 export function ChangesPanel() {
-  const { backend, storeId, version, changesOpen, toggleChanges, summary, push, discardAll, openDrawer, busy } = useApp();
+  const { backend, storeId, version, changesOpen, toggleChanges, summary, push, discardAll, openDrawer, busy, taxonomy } = useApp();
   const [changes, setChanges] = useState<StagedChange[]>([]);
   const [label, setLabel] = useState("");
   useEffect(() => {
@@ -21,6 +21,13 @@ export function ChangesPanel() {
     }
     return [...m.values()].sort((a, b) => Number(!!b.find((c) => c.conflict)) - Number(!!a.find((c) => c.conflict)));
   }, [changes]);
+  // Category ids (and new categories' staging keys) read as names.
+  const catNames = new Map((taxonomy?.categories ?? []).map((c) => [String(c._state.is_new ? c._state.key : c.id), c.name]));
+  const show = (field: string, v: unknown) => {
+    if (field === "category_ids" && Array.isArray(v)) return v.length ? v.map((x) => catNames.get(String(x)) ?? String(x)).join(", ") : "—";
+    if (field === "parent" && (typeof v === "number" || typeof v === "string")) return String(v) === "0" ? "None (top level)" : catNames.get(String(v)) ?? String(v);
+    return formatValue(v);
+  };
   if (!changesOpen) return null;
   const discard = async (c: StagedChange) => {
     await backend.discard(storeId!, c.entity, c.key, c.field);
@@ -59,14 +66,14 @@ export function ChangesPanel() {
                 <div key={c.field} className={clsx("group mt-1 rounded px-2 py-1 text-xs", c.conflict ? "bg-removed/10" : "bg-sunken/60")}>
                   <div className="flex items-center gap-1">
                     <span className="w-24 shrink-0 text-muted">{fieldLabel(c.field)}</span>
-                    <span className="min-w-0 truncate text-removed line-through decoration-removed/50">{formatValue(c.base)}</span>
+                    <span className="min-w-0 truncate text-removed line-through decoration-removed/50">{show(c.field, c.base)}</span>
                     <ArrowRight size={11} className="shrink-0 text-muted" />
-                    <span className="min-w-0 flex-1 truncate text-added">{formatValue(c.value)}</span>
+                    <span className="min-w-0 flex-1 truncate text-added">{show(c.field, c.value)}</span>
                     <button className="hidden text-muted hover:text-fg group-hover:block" title="Discard this change" onClick={() => discard(c)}><RotateCcw size={12} /></button>
                   </div>
                   {c.conflict && (
                     <div className="mt-1 flex items-center gap-1.5 text-removed">
-                      <AlertTriangle size={12} /> Changed on the store to “{formatValue(c.conflict.remote)}”
+                      <AlertTriangle size={12} /> Changed on the store to “{show(c.field, c.conflict.remote)}”
                       <span className="flex-1" />
                       <button className="rounded border border-line bg-panel px-1.5 text-fg" onClick={() => resolve(c, true)}>Keep mine</button>
                       <button className="rounded border border-line bg-panel px-1.5 text-fg" onClick={() => resolve(c, false)}>Use store's</button>
