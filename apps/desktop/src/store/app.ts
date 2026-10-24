@@ -34,6 +34,8 @@ interface AppState {
   version: number;
   toasts: Toast[];
   dark: boolean;
+  /** Ticking a sub-category for a product also ticks its parent categories. */
+  catWithParents: boolean;
 
   init(): Promise<void>;
   selectStore(id: string): Promise<void>;
@@ -55,6 +57,7 @@ interface AppState {
   toast(t: Omit<Toast, "id">): void;
   dismissToast(id: number): void;
   setDark(d: boolean): void;
+  setCatWithParents(v: boolean): void;
 }
 
 let toastId = 0;
@@ -79,6 +82,13 @@ export const useApp = create<AppState>((set, get) => ({
   busy: null,
   version: 0,
   toasts: [],
+  catWithParents: (() => {
+    try {
+      return localStorage.getItem("cf.cat.withParents") === "1";
+    } catch {
+      return false;
+    }
+  })(),
   dark: false,
 
   async init() {
@@ -232,6 +242,14 @@ export const useApp = create<AppState>((set, get) => ({
     setTimeout(() => get().dismissToast(id), t.tone === "error" ? 9000 : 4500);
   },
   dismissToast: (id) => set({ toasts: get().toasts.filter((t) => t.id !== id) }),
+  setCatWithParents(v) {
+    try {
+      localStorage.setItem("cf.cat.withParents", v ? "1" : "0");
+    } catch {
+      /* preference only */
+    }
+    set({ catWithParents: v });
+  },
   setDark(dark) {
     document.documentElement.classList.toggle("dark", dark);
     try {

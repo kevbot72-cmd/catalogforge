@@ -1,6 +1,8 @@
 import { ChevronDown, ChevronRight, Search, Star, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useState, type InputHTMLAttributes } from "react";
 import type { CategoryRow, LocalFile, Media, MediaRef, MediaValue } from "../backend/types";
+import { ancestorKeys, assignCategory, categoryPath } from "../lib/categoryAssign";
+import { useApp } from "../store/app";
 import { clsx, Dropzone, Input, mediaUrl, TextArea, Thumb } from "./ui";
 
 /** Input that commits on blur/Enter instead of on every keystroke (one undo step per edit). */
@@ -86,44 +88,71 @@ export function categoryTree(cats: CategoryRow[]) {
   return { keyOf, children };
 }
 
-/** Category checklist with search, used in the product drawer and the mass changer. */
+/**
+ * Category checklist with search, used in the product drawer and the mass changer. Parents and
+ * sub-categories each have their own box; chosen categories are listed as full paths above.
+ */
 export function CategoryPicker({ categories, value, onChange }: { categories: CategoryRow[]; value: (number | string)[]; onChange: (v: (number | string)[]) => void }) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState<Set<string>>(new Set());
-  const { keyOf, children } = useMemo(() => categoryTree(categories.filter((c) => !c._state.deleted)), [categories]);
+  const withParents = useApp((s) => s.catWithParents);
+  const setWithParents = useApp((s) => s.setCatWithParents);
+  const cats = useMemo(() => categories.filter((c) => !c._state.deleted), [categories]);
+  const { keyOf, children } = useMemo(() => categoryTree(cats), [cats]);
   const selected = new Set(value.map(String));
-  const toggle = (c: CategoryRow) => {
-    const k = keyOf(c);
-    const id: number | string = c._state.is_new ? k : c.id;
-    onChange(selected.has(k) ? value.filter((v) => String(v) !== k) : [...value, id]);
-  };
-  const matches = q ? categories.filter((c) => c.name.toLowerCase().includes(q.toLowerCase())) : null;
+  // Parents of ticked categories open automatically and show how many ticked categories they hold.
+  const inside = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const k of value.map(String)) for (const a of ancestorKeys(cats, k)) m.set(a, (m.get(a) ?? 0) + 1);
+    return m;
+  }, [value, cats]);
+  const toggle = (c: CategoryRow) => onChange(assignCategory(value, cats, c, !selected.has(keyOf(c)), withParents));
+  const matches = q ? cats.filter((c) => c.name.toLowerCase().includes(q.toLowerCase())) : null;
   const renderNode = (c: CategoryRow, depth: number): JSX.Element => {
     const k = keyOf(c);
     const kids = children.get(k) ?? [];
-    const isOpen = open.has(k) || depth === 0 || kids.some((x) => selected.has(keyOf(x)));
+    const isOpen = open.has(k) ? true : open.has(`-${k}`) ? false : inside.has(k);
     return (
       <div key={k}>
         <div className="flex items-center gap-1 rounded px-1 py-0.5 hover:bg-sunken" style={{ paddingLeft: depth * 16 + 4 }}>
           {kids.length ? (
-            <button type="button" className="text-muted" onClick={() => setOpen((s) => new Set(s.has(k) ? [...s].filter((x) => x !== k) : [...s, k]))}>
+            <button type="button" className="text-muted" aria-label={isOpen ? `Collapse ${c.name}` : `Expand ${c.name}`} onClick={() => setOpen((s) => {
+              const n = new Set([...s].filter((x) => x !== k && x !== `-${k}`));
+              n.add(isOpen ? `-${k}` : k);
+              return n;
+            })}>
               {isOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
             </button>
           ) : (
             <span className="w-[13px]" />
           )}
           <label className="flex flex-1 cursor-pointer items-center gap-2 text-[13px]">
-            <input type="checkbox" checked={selected.has(k)} onChange={() => toggle(c)} className="accent-[rgb(var(--accent))]" />
-            {c.name}
+            <input type="checkbox" checked={selected.has(k)} onChange={() => toggle(c)} className="accent-[rgb(var(--accent))]" aria-label={c.name} data-testid={`catpick-${c.name}`} />
+            <span className={clsx(depth === 0 && "font-medium")}>{c.name}</span>
             {c._state.is_new && <span className="text-2xs text-added">new</span>}
+            {!selected.has(k) && inside.has(k) && <span className="text-2xs text-accent" title="A sub-category is ticked, but not this category itself">{inside.get(k)} ticked inside</span>}
           </label>
         </div>
         {isOpen && kids.map((x) => renderNode(x, depth + 1))}
       </div>
     );
   };
+  const byKey = new Map(cats.map((c) => [keyOf(c), c]));
   return (
-    <div className="rounded-md border border-line">
+    <div className="rounded-md border border-line" data-testid="category-picker">
+      {value.length > 0 && (
+        <div className="flex flex-wrap gap-1 border-b border-line p-2" data-testid="category-chips">
+          {value.map((v) => {
+            const c = byKey.get(String(v));
+            return (
+              <span key={String(v)} className="flex items-center gap-1 rounded-full bg-accent/10 py-0.5 pl-2 pr-1 text-xs text-accent">
+                {c ? categoryPath(cats, String(v)) : `#${v}`}
+                <button type="button" onClick={() => onChange(value.filter((x) => String(x) !== String(v)))} aria-label={`Remove ${c?.name ?? v}`} className="rounded-full p-0.5 hover:bg-accent/20"><X size={11} /></button>
+              </span>
+            );
+          })}
+        </div>
+      )}
       <div className="flex items-center gap-2 border-b border-line px-2">
         <Search size={13} className="text-muted" />
         <input className="h-8 flex-1 bg-transparent text-[13px] focus:outline-none" placeholder="Search categories" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -133,11 +162,15 @@ export function CategoryPicker({ categories, value, onChange }: { categories: Ca
           ? matches.map((c) => (
               <label key={keyOf(c)} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-[13px] hover:bg-sunken">
                 <input type="checkbox" checked={selected.has(keyOf(c))} onChange={() => toggle(c)} />
-                {c.name}
+                {categoryPath(cats, keyOf(c))}
               </label>
             ))
           : (children.get("0") ?? []).map((c) => renderNode(c, 0))}
       </div>
+      <label className="flex items-center gap-2 border-t border-line px-2 py-1.5 text-xs text-muted">
+        <input type="checkbox" checked={withParents} onChange={(e) => setWithParents(e.target.checked)} data-testid="cat-with-parents" />
+        Ticking a sub-category also ticks its parent categories
+      </label>
     </div>
   );
 }
