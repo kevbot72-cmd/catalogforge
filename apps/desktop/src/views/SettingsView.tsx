@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import pkg from "../../package.json";
 import type { MediaSettings } from "../backend/types";
 import { Badge, Button, Field, Input, Select, Toggle } from "../components/ui";
 import { useApp } from "../store/app";
@@ -74,7 +75,7 @@ export function SettingsView() {
             </div>
           </section>
         )}
-        <section className="text-xs text-muted">{stores.length} store{stores.length === 1 ? "" : "s"} connected · running in {backend.kind === "demo" ? "demo mode (sample data in your browser)" : "desktop mode"}</section>
+        <section className="text-xs text-muted" data-testid="app-version">CatalogForge {pkg.version} · {stores.length} store{stores.length === 1 ? "" : "s"} connected · running in {backend.kind === "demo" ? "demo mode (sample data in your browser)" : "desktop mode"}</section>
       </div>
     </div>
   );
