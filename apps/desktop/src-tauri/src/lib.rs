@@ -402,6 +402,40 @@ async fn preview(state: State<'_, AppState>, id: String, product_id: Option<i64>
     s.driver.preview(product_id, &draft).await.map_err(err)
 }
 
+/* -------------------------------------------------------------- migration */
+
+/// Both stores' caches, refusing the same store twice.
+async fn two_stores(state: &AppState, src: &str, dst: &str) -> CmdResult<(Arc<OpenStore>, Arc<OpenStore>)> {
+    let a = state.store(src).await?;
+    let b = state.store(dst).await?;
+    if Arc::ptr_eq(&a.cache, &b.cache) {
+        return Err("Choose two different stores".into());
+    }
+    Ok((a, b))
+}
+
+#[tauri::command]
+async fn migration_preview(state: State<'_, AppState>, src: String, dst: String, opts: forge_core::migrate::MigrateOptions) -> CmdResult<forge_core::migrate::MigrationSummary> {
+    let (a, b) = two_stores(&state, &src, &dst).await?;
+    let (ac, bc) = (a.cache.lock().unwrap(), b.cache.lock().unwrap());
+    forge_core::migrate::plan(&ac, &src, &bc, &opts).map(|(s, _)| s).map_err(err)
+}
+
+#[tauri::command]
+async fn migration_stage(state: State<'_, AppState>, src: String, dst: String, opts: forge_core::migrate::MigrateOptions) -> CmdResult<forge_core::migrate::MigrationSummary> {
+    let (a, b) = two_stores(&state, &src, &dst).await?;
+    let ac = a.cache.lock().unwrap();
+    let mut bc = b.cache.lock().unwrap();
+    forge_core::migrate::stage(&ac, &src, &mut bc, &opts).map_err(err)
+}
+
+#[tauri::command]
+async fn migration_verify(state: State<'_, AppState>, src: String, dst: String, opts: forge_core::migrate::MigrateOptions) -> CmdResult<forge_core::migrate::VerifyReport> {
+    let (a, b) = two_stores(&state, &src, &dst).await?;
+    let (ac, bc) = (a.cache.lock().unwrap(), b.cache.lock().unwrap());
+    forge_core::migrate::verify(&ac, &bc, &opts).map_err(err)
+}
+
 #[tauri::command]
 async fn clone_products(state: State<'_, AppState>, src: String, dst: String, ids: Vec<i64>, opts: CloneOptions) -> CmdResult<sync::CloneReport> {
     let a = state.store(&src).await?;
@@ -589,7 +623,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             list_stores, add_store, remove_store, local_sites, start_local_site, open_store, pull, query, rows, skus, variations, taxonomy, media, stage, create,
-            remove, undo, discard, summary, changes, resolve_conflict, push, history, history_items, revert, preview, clone_products, scan_paths, resolve_image_paths, meta_keys, set_custom_fields, catalogue_image,
+            remove, undo, discard, summary, changes, resolve_conflict, push, history, history_items, revert, preview, clone_products, migration_preview, migration_stage, migration_verify, scan_paths, resolve_image_paths, meta_keys, set_custom_fields, catalogue_image,
             read_file, write_file, get_media_settings, set_media_settings
         ])
         .run(tauri::generate_context!())

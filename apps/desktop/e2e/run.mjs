@@ -527,6 +527,34 @@ await step("categories page: products in a category with tick boxes", async () =
   await shot("26-category-products");
 });
 
+await step("migration: pre-flight, prepare, push and verify into an empty store", async () => {
+  await page.getByTestId("nav-migration").click();
+  await page.getByTestId("migration-view").waitFor();
+  await page.getByTestId("migration-src").selectOption("demo-local");
+  await page.getByTestId("migration-dst").selectOption("demo-new");
+  await page.getByTestId("migration-stats").waitFor({ timeout: 30000 });
+  await page.waitForTimeout(600);
+  const stats = await page.getByTestId("migration-stats").innerText();
+  expect(/\d+\s*products to create/.test(stats) && !stats.includes("\n0\nproducts to create"), `products to create: ${stats}`);
+  await page.getByTestId("migration-status").selectOption("draft");
+  await page.waitForTimeout(500);
+  await shot("27-migration-preflight");
+  await page.getByTestId("migration-prepare").click();
+  await page.getByText(/Migration ready in New Store/).waitFor({ timeout: 30000 });
+  await page.getByTestId("migration-push").click();
+  await page.getByTestId("push-confirm-yes").click();
+  await page.getByTestId("toast").filter({ hasText: "Pushed" }).first().waitFor({ timeout: 60000 });
+  await page.getByTestId("migration-check").click();
+  await page.getByTestId("migration-report").waitFor({ timeout: 30000 });
+  const report = await page.getByTestId("migration-report").innerText();
+  expect(report.includes("Everything matches"), `verify: ${report.slice(0, 200)}`);
+  await shot("28-migration-verified");
+  // Running it again finds nothing new.
+  await page.getByTestId("migration-dst").selectOption("demo-new");
+  await page.waitForTimeout(800);
+  expect((await page.getByTestId("migration-prepare").innerText()).includes("Nothing to move") || (await page.getByTestId("migration-stats").innerText()).includes("already there"), "second run skips everything");
+}, 120000);
+
 await step("dark mode", async () => {
   await page.getByTestId("nav-products").click();
   await page.getByLabel("Toggle dark mode").click();

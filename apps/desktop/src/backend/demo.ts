@@ -4,7 +4,7 @@
 
 import type {
   Backend, Category, CategoryRow, CloneOptions, Edit, Entity, HistoryEntry, HistoryItem, LocalFile, Media, MediaSettings, NewStoreInput,
-  Product, ProductQuery, ProductRow, Progress, PushReport, StagedChange, StagedSummary, StoreInfo, StoreProfile, TaxonomyData, MetaKeyInfo } from "./types";
+  Product, ProductQuery, ProductRow, Progress, PushReport, StagedChange, StagedSummary, StoreInfo, StoreProfile, TaxonomyData, MetaKeyInfo, MediaValue, MigrateOptions, MigrationSummary, VerifyReport } from "./types";
 
 const NEW = "new:";
 const DEL = "__delete";
@@ -185,6 +185,94 @@ function generate(profile: StoreProfile, seed: number, count: number): StoreData
 
 const DEFAULT_SETTINGS: MediaSettings = { format: "webp", quality: 82, max_dimension: 2560, generate_sizes: true, name_template: "{sku}-{name}-{n}" };
 
+/** The demo's version of forge-core's migrate::plan (same rules, simpler bookkeeping). */
+function migrationPlan(src: StoreData, dst: StoreData, opts: MigrateOptions): { summary: MigrationSummary; edits: Edit[] } {
+  const sum: MigrationSummary = { categories_create: 0, categories_existing: 0, products_create: 0, products_update: 0, products_skip: 0, variations: 0, images: 0, tags: 0, attributes: [], custom_fields: [], no_sku: 0, duplicate_skus: [], already_staged: 0, already_staged_categories: 0, source_products: 0, target_products: [...dst.products.values()].filter((p) => p.type !== "variation").length, warnings: [] };
+  const edits: Edit[] = [];
+  const pathOf = (cats: Map<number, Category>, id: number): string => {
+    const c = cats.get(id);
+    return c ? (c.parent && cats.has(Number(c.parent)) ? `${pathOf(cats, Number(c.parent))} > ` : "") + c.name.toLowerCase() : "";
+  };
+  const dstPaths = new Map([...dst.categories.keys()].map((id) => [pathOf(dst.categories, id), id]));
+  const scope = new Set<number>(opts.category_ids);
+  if (scope.size) for (let grew = true; grew; ) {
+    grew = false;
+    for (const c of src.categories.values()) if (scope.has(Number(c.parent)) && !scope.has(c.id)) (scope.add(c.id), (grew = true));
+  }
+  const parents = [...src.products.values()].filter((p) => p.type !== "variation" && (opts.include_drafts || p.status === "publish") && (!scope.size || p.category_ids.some((c) => scope.has(Number(c)))));
+  sum.source_products = parents.length;
+  const used = new Set(parents.flatMap((p) => p.category_ids.map(Number)));
+  const wanted = [...src.categories.values()].filter((c) => (!scope.size || scope.has(c.id)) && (opts.include_empty_categories || used.has(c.id)));
+  for (const c of [...wanted]) for (let p = src.categories.get(Number(c.parent)); p; p = src.categories.get(Number(p.parent))) if (!wanted.includes(p)) wanted.push(p);
+  wanted.sort((a, b) => pathOf(src.categories, a.id).split(" > ").length - pathOf(src.categories, b.id).split(" > ").length);
+  const catMap = new Map<number, number | string>();
+  const img = (id: MediaValue) => (opts.include_images && typeof id === "number" && id > 0 && src.media.get(id) ? { url: src.media.get(id)!.url, alt: src.media.get(id)!.alt } : null);
+  const images = new Set<string>();
+  const create = (entity: Entity, fields: Record<string, unknown>) => {
+    const key = `${NEW}mig${uid()}`;
+    edits.push({ entity, key, field: NEWF, value: true });
+    for (const [f, v] of Object.entries(fields)) edits.push({ entity, key, field: f, value: v });
+    return key;
+  };
+  for (const c of wanted) {
+    const existing = dstPaths.get(pathOf(src.categories, c.id));
+    if (existing !== undefined) {
+      sum.categories_existing++;
+      catMap.set(c.id, existing);
+      continue;
+    }
+    const f: Record<string, unknown> = { name: c.name, parent: catMap.get(Number(c.parent)) ?? 0, description: c.description, menu_order: c.menu_order };
+    const i = img(c.image_id);
+    if (i) (f.image_id = i, images.add(i.url));
+    sum.categories_create++;
+    catMap.set(c.id, create("category", f));
+  }
+  const skus = new Map<string, number>();
+  const stagedSkus = new Set([...dst.staged].filter(([k, f]) => k.split("|")[1].startsWith(NEW) && f.has(NEWF)).map(([, f]) => String(f.get("sku")?.value ?? "")).filter(Boolean));
+  for (const p of parents) {
+    if (p.sku && stagedSkus.has(p.sku)) {
+      sum.already_staged++;
+      continue;
+    }
+    if (p.sku) skus.set(p.sku, (skus.get(p.sku) ?? 0) + 1);
+    else sum.no_sku++;
+    const existing = p.sku ? [...dst.products.values()].find((x) => x.sku === p.sku) : undefined;
+    if (existing && opts.existing === "skip") {
+      sum.products_skip++;
+      continue;
+    }
+    const f: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(p)) if (!["id", "parent_id", "image_id", "gallery_ids", "category_ids", "permalink", "date_created_gmt", "date_modified_gmt"].includes(k) && (opts.include_custom_fields || !k.startsWith("meta:")) && v !== "" && v !== null) f[k] = v;
+    if (opts.status) f.status = opts.status;
+    f.category_ids = p.category_ids.map((c) => catMap.get(Number(c))).filter((x) => x !== undefined);
+    const i = img(p.image_id);
+    if (i) (f.image_id = i, images.add(i.url));
+    let parentKey: number | string;
+    if (existing) {
+      sum.products_update++;
+      for (const [k, v] of Object.entries(f)) if (k !== "type") edits.push({ entity: "product", key: String(existing.id), field: k, value: v });
+      parentKey = existing.id;
+    } else {
+      sum.products_create++;
+      parentKey = create("product", f);
+    }
+    for (const v of src.products.values()) {
+      if (v.type !== "variation" || v.parent_id !== p.id) continue;
+      sum.variations++;
+      create("variation", { sku: v.sku, regular_price: v.regular_price, manage_stock: v.manage_stock, stock_quantity: v.stock_quantity, stock_status: v.stock_status, variation_attributes: v.variation_attributes, parent_id: parentKey });
+    }
+  }
+  sum.duplicate_skus = [...skus].filter(([, n]) => n > 1).map(([k]) => k);
+  sum.images = images.size;
+  sum.tags = new Set(parents.flatMap((p) => p.tags)).size;
+  sum.attributes = [...new Set(parents.flatMap((p) => p.attributes.map((a) => a.name)))];
+  sum.custom_fields = opts.include_custom_fields ? [...new Set(parents.flatMap((p) => Object.keys(p).filter((k) => k.startsWith("meta:")).map((k) => k.slice(5))))] : [];
+  if (sum.target_products) sum.warnings.push(`The destination already has ${sum.target_products} products. Matching SKUs are ${opts.existing === "skip" ? "left alone" : "updated"}; everything else is added alongside them.`);
+  if (sum.already_staged) sum.warnings.push(`${sum.already_staged} products are already staged in the destination from an earlier run that hasn't been pushed. They are left out; push or undo that run first.`);
+  if (sum.no_sku) sum.warnings.push(`${sum.no_sku} products have no SKU. They can't be matched, so running the migration again would create them twice.`);
+  return { summary: sum, edits };
+}
+
 export function createDemoBackend(): Backend {
   const stores = new Map<string, StoreData>();
   /** Files picked in this session, by the name used as their path. */
@@ -198,6 +286,12 @@ export function createDemoBackend(): Backend {
     [{ id: "demo-local", name: "northwind.local", environment: "local", color: "#16a34a", connection: { kind: "demo", seed: 2 }, created_at: 0, last_synced_at: null }, 2, 120],
   ];
   for (const [p, seed, n] of seedProfiles) stores.set(p.id, generate(p, seed, n));
+  // A brand-new, empty store to try Migration with.
+  const empty = generate({ id: "demo-new", name: "New Store", environment: "staging", color: "#7c3aed", connection: { kind: "demo", seed: 3 }, created_at: 0, last_synced_at: null }, 3, 0);
+  empty.categories.clear();
+  empty.media.clear();
+  empty.tags.clear();
+  stores.set("demo-new", empty);
 
   const S = (id: string) => {
     const s = stores.get(id);
@@ -787,6 +881,30 @@ export function createDemoBackend(): Backend {
       const f = picked.get(path);
       if (!f) throw new Error(`File not available: ${path}`);
       return new Uint8Array(await f.arrayBuffer());
+    },
+    async migrationPreview(src, dst, opts) {
+      return migrationPlan(S(src), S(dst), opts).summary;
+    },
+    async migrationStage(src, dst, opts) {
+      const { summary: sum, edits } = migrationPlan(S(src), S(dst), opts);
+      stage(S(dst), edits);
+      return sum;
+    },
+    async migrationVerify(src, dst, opts) {
+      const d = new Map([...S(dst).products.values()].filter((p) => p.sku).map((p) => [p.sku, p]));
+      const r: VerifyReport = { checked: 0, matched: 0, missing: [], differences: [], images_missing: 0 };
+      for (const p of S(src).products.values()) {
+        if (!p.sku || (!opts.include_drafts && p.status !== "publish" && p.type !== "variation")) continue;
+        r.checked++;
+        const t = d.get(p.sku);
+        if (!t) r.missing.push([p.sku, p.name]);
+        else {
+          r.matched++;
+          if (Number(p.regular_price || 0) !== Number(t.regular_price || 0)) r.differences.push([p.sku, "regular_price", p.regular_price, t.regular_price]);
+          if (opts.include_images && p.image_id && !t.image_id) r.images_missing++;
+        }
+      }
+      return r;
     },
     async metaKeys(id) {
       const s = S(id);

@@ -430,8 +430,52 @@ export interface Backend {
   printImage(src: string, maxPx: number, quality: number): Promise<Uint8Array | null>;
   /** Bytes of a file the user picked (template PDF, logo, font). */
   readFile(path: string): Promise<Uint8Array>;
+  /** What migrating `src` into `dst` would do (nothing is staged). */
+  migrationPreview(src: string, dst: string, opts: MigrateOptions): Promise<MigrationSummary>;
+  /** Stages the migration in `dst` as one undoable step. */
+  migrationStage(src: string, dst: string, opts: MigrateOptions): Promise<MigrationSummary>;
+  /** Compares the two stores after a migration was pushed and `dst` re-synced. */
+  migrationVerify(src: string, dst: string, opts: MigrateOptions): Promise<VerifyReport>;
   /** Plugin fields found on the store's products. */
   metaKeys(id: string): Promise<MetaKeyInfo[]>;
   /** Saves which plugin fields this store manages (then pull with full=true to load them). */
   setCustomFields(id: string, fields: CustomField[]): Promise<StoreProfile>;
+}
+
+export interface MigrateOptions {
+  existing: "skip" | "update";
+  status: string | null;
+  include_images: boolean;
+  include_drafts: boolean;
+  include_custom_fields: boolean;
+  include_empty_categories: boolean;
+  category_ids: number[];
+}
+
+export interface MigrationSummary {
+  categories_create: number;
+  categories_existing: number;
+  products_create: number;
+  products_update: number;
+  products_skip: number;
+  variations: number;
+  images: number;
+  tags: number;
+  attributes: string[];
+  custom_fields: string[];
+  no_sku: number;
+  duplicate_skus: string[];
+  source_products: number;
+  target_products: number;
+  already_staged: number;
+  already_staged_categories: number;
+  warnings: string[];
+}
+
+export interface VerifyReport {
+  checked: number;
+  matched: number;
+  missing: [string, string][];
+  differences: [string, string, string, string][];
+  images_missing: number;
 }

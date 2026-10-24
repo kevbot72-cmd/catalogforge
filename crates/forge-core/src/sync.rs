@@ -236,7 +236,9 @@ async fn resolve_media(driver: &dyn Driver, cache: &Mutex<Cache>, settings: &Med
     }
 
     let total = refs.len();
-    let client = reqwest::Client::builder().timeout(std::time::Duration::from_secs(120)).build()?;
+    // Images may come from a Local site on this computer (migrations, clones), which uses a
+    // self-signed certificate; these are public product images, not credentials.
+    let client = reqwest::Client::builder().timeout(std::time::Duration::from_secs(120)).danger_accept_invalid_certs(true).build()?;
     let sizes = hs.image_sizes.clone();
     let mut settings = settings.clone();
     if hs.big_image_threshold > 0 {

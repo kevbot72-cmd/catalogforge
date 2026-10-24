@@ -1,4 +1,4 @@
-import { BookOpen, Boxes, Layers, ChevronDown, ChevronRight, FolderTree, History, Image as ImageIcon, Moon, Package, Plus, Settings, Sun, Tag } from "lucide-react";
+import { BookOpen, Boxes, Layers, Truck, ChevronDown, ChevronRight, FolderTree, History, Image as ImageIcon, Moon, Package, Plus, Settings, Sun, Tag } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CategoryRow, Edit, LocalFile, ProductRow } from "../backend/types";
 import { ancestorKeys, assignCategory, catKey } from "../lib/categoryAssign";
@@ -170,6 +170,7 @@ export function Sidebar() {
         <NavItem id="categories" icon={<FolderTree size={15} />} label="Categories" count={taxonomy?.categories.length} />
         <NavItem id="media" icon={<ImageIcon size={15} />} label="Media" count={media.size} />
         <NavItem id="catalogue" icon={<BookOpen size={15} />} label="Catalogue PDF" />
+        <NavItem id="migration" icon={<Truck size={15} />} label="Migration" />
         <NavItem id="history" icon={<History size={15} />} label="History" />
         <NavItem id="settings" icon={<Settings size={15} />} label="Settings" />
       </nav>

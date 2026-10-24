@@ -5,17 +5,18 @@
 Tested against WordPress 6.8.3 + WooCommerce 9.9.5 on MariaDB (PHP built-in server):
 
 - **Plugin smoke test (40 checks):** signing, replay protection, a variable product with global attributes plus categories created through references in one batch, idempotent SKU matching, conflict detection, media upload with client-made sizes and deduplication, category and media updates, export, preview (existing and unsaved products, coming-soon mode), delete.
-- **Engine integration tests (7):**
+- **Engine integration tests (8):**
   - the full cycle: pull → stage → push with images → conflict → resolve → revert from history → delta pull with remote deletion → category filter → preview;
   - the MySQL reader matching the plugin field-for-field on 1,000 products and every category;
   - the Local adapter auto-provisioning (re-activating the plugin and creating a key) and writing media directly to disk;
   - throughput;
   - custom fields: discovery over the connector and MySQL, reading, editing, pushing and conflict detection;
   - media deletion: the attachment is removed on the store and from the cache, and the product loses the image;
-  - formatted descriptions (lists, bold, colour, size) are stored by WooCommerce exactly as pushed.
+  - formatted descriptions (lists, bold, colour, size) are stored by WooCommerce exactly as pushed;
+  - migration of a whole store (10,663 products) into a second, empty WooCommerce store, verified product by product, with a second run creating nothing.
 - **Unit tests:** 30 engine (cache, staging and undo, history, PHP serialization, signing, Local discovery, WordPress resize geometry, WebP pipeline, clone mapping) and 16 UI logic (formula engine, import planner, bulk edits).
 - **Catalogue tests:** planning (exclusions at every level, pagination, contents page numbers, continuous flow and divider pages), text wrapping, and full PDF renders of every layout with a template, links, QR codes and bookmarks.
-- **UI end-to-end (26 steps):** grid edit and paste, undo, palette, drawer and live preview, paste cleanup, bulk edit, import with validation, variation matrix, diff panel, push, history revert, category drag-nesting, Local discovery, export, custom fields, new-product tabs, catalogue (leave out a category, change layout, cover and header text, load a template PDF, create the full PDF), category tick boxes for selected products (sub-category only, with parents, untick a parent), media range select, select all, delete with undo, pasting Google Docs text into bulk edit, push confirmation (No keeps changes staged, Yes pushes), Batch Builder (images matched and swapped, CSV export, batch added to the store, numbering continues), products in a category with tick boxes (sub-category products, tick, untick, add from the store), dark mode.
+- **UI end-to-end (27 steps):** grid edit and paste, undo, palette, drawer and live preview, paste cleanup, bulk edit, import with validation, variation matrix, diff panel, push, history revert, category drag-nesting, Local discovery, export, custom fields, new-product tabs, catalogue (leave out a category, change layout, cover and header text, load a template PDF, create the full PDF), category tick boxes for selected products (sub-category only, with parents, untick a parent), media range select, select all, delete with undo, pasting Google Docs text into bulk edit, push confirmation (No keeps changes staged, Yes pushes), Batch Builder (images matched and swapped, CSV export, batch added to the store, numbering continues), products in a category with tick boxes (sub-category products, tick, untick, add from the store), migration into an empty store (pre-flight, prepare, push, verify, re-run skips everything), dark mode.
 - **Real desktop app (Tauri on Linux):** loaded 6,695 products from the test store through the connector; switched to a Local site (MySQL pull and auto-provisioning); edited in the grid; pushed with ⌘S (verified in the database); live preview inside the app.
 
 Measured on the test machine (PHP built-in server, untuned MariaDB, so real hosting will differ):
@@ -25,6 +26,18 @@ Measured on the test machine (PHP built-in server, untuned MariaDB, so real host
 | Create via connector (full WooCommerce save path, 2,000 products) | ~50 products/s (was ~25/s before the writer optimisations) |
 | Pull via connector | ~740 products/s |
 | Pull via direct MySQL / Local | ~5,800 products/s (6,695 products in 1.2 s) |
+
+## New in 0.4.0
+
+- **Migration** (sidebar → Migration), for moving your catalogue into a new store:
+  1. **From and to**: pick the two stores (or add the new one); both are read fresh.
+  2. **What to move**: images, drafts and private products, custom fields (and set up the same custom fields on the new store), empty categories, the whole catalogue or only some categories; existing SKUs left alone or updated; keep each product's status, make everything a draft to check before going live, or publish everything.
+  3. **Pre-flight check**: what will be created, updated and skipped (products, variations, categories, images, tags, attributes, custom fields), with warnings for different currencies or units, a destination that isn't empty, products without SKUs, duplicate SKUs, read-only connections and REST-only destinations.
+  4. **Prepare and push**: stages everything in the new store as one undoable step, switches to it, and pushes with the usual confirmation and progress.
+  5. **Check the result**: re-reads the new store and compares every product with a SKU (present, price, stock, name, main image), listing anything missing or different.
+  - Images are downloaded by the app and uploaded to the new store, so a Local site on your computer can be migrated to a live host. Each migrated product records where it came from. Running it again is safe: products already there, or already staged by an earlier run, are skipped.
+  - Not moved (yet): orders, customers, coupons, reviews, pages and posts, menus, theme and store settings; up-sells and cross-sells aren't linked.
+- **Verified** against two real WooCommerce stores: 10,663 products, 69 variations, 54 categories and 38 images migrated into an empty store in under 3 minutes, with every product verified and a second run creating nothing.
 
 ## New in 0.3.1
 
@@ -83,7 +96,7 @@ Measured on the test machine (PHP built-in server, untuned MariaDB, so real host
 
 ## Next
 
-0. **Store migration (phase 2)**: a Migration section to move a whole store (categories, products, variations, images, custom fields) into a new, empty store.
+0. **Migration, next steps**: up-sells, cross-sells and grouped products; customers and orders (with the connector on both stores); pages and menus.
 
 1. **SSH tunnel and SFTP drivers**: direct MySQL over SSH, and SFTP media upload for hosts that block HTTP uploads.
 2. **Scheduled supplier feeds**: saved import profiles run on a schedule from SFTP/HTTP/FTP, with a dry-run report before staging.

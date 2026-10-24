@@ -353,6 +353,13 @@ impl Cache {
         })
     }
 
+    /// Every product and variation in the cache (server values, no staged edits).
+    pub fn all_products(&self) -> Result<Vec<Product>> {
+        let mut stmt = self.conn.prepare("SELECT data FROM products ORDER BY id")?;
+        let rows = stmt.query_map([], |r| r.get::<_, String>(0))?;
+        rows.map(|r| Ok(serde_json::from_str(&r?)?)).collect()
+    }
+
     pub fn product_by_sku(&self, sku: &str) -> Result<Option<Product>> {
         if sku.is_empty() {
             return Ok(None);

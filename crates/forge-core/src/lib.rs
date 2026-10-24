@@ -14,6 +14,7 @@ pub mod custom_fields;
 pub mod drivers;
 pub mod local;
 pub mod media;
+pub mod migrate;
 pub mod model;
 pub mod phpser;
 pub mod signing;

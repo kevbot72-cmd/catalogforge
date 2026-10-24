@@ -79,6 +79,9 @@ export function createTauriBackend(): Backend {
     },
     getMediaSettings: () => invoke("get_media_settings"),
     metaKeys: (id) => invoke("meta_keys", { id }),
+    migrationPreview: (src, dst, opts) => invoke("migration_preview", { src, dst, opts }),
+    migrationStage: (src, dst, opts) => invoke("migration_stage", { src, dst, opts }),
+    migrationVerify: (src, dst, opts) => invoke("migration_verify", { src, dst, opts }),
     async printImage(src, max, quality) {
       try {
         return new Uint8Array(await invoke<ArrayBuffer>("catalogue_image", { src, max, quality }));

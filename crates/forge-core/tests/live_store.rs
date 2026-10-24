@@ -445,3 +445,45 @@ async fn formatted_descriptions_survive_a_push() {
     let stored = MysqlDriver::connect(&mysql_target(), None).await.unwrap().catalog_by_ids(&[id]).await.unwrap().products.remove(0).short_description;
     assert_eq!(stored, html, "WooCommerce keeps bullets, bold, colour and size");
 }
+
+/// Migrates the whole test catalogue into a second, empty store (CF_TEST2_*), then verifies it and
+/// checks that running it again creates nothing.
+#[tokio::test]
+async fn migrate_whole_store_into_empty_store() {
+    let (Some(src), Some(url2), Some(key2), Some(secret2)) = (connector(), env("CF_TEST2_URL"), env("CF_TEST2_KEY"), env("CF_TEST2_SECRET")) else {
+        return eprintln!("CF_TEST2_URL not set; skipping");
+    };
+    use forge_core::migrate::{self, MigrateOptions};
+    let dst = ConnectorDriver::for_local(&url2, &key2, &secret2, None).unwrap();
+    let tmp = tempfile::tempdir().unwrap();
+    let a = Mutex::new(Cache::open(&tmp.path().join("a.db")).unwrap());
+    let b = Mutex::new(Cache::open(&tmp.path().join("b.db")).unwrap());
+    sync::pull(&src, &a, true, no_progress()).await.unwrap();
+    sync::pull(&dst, &b, true, no_progress()).await.unwrap();
+
+    let opts = MigrateOptions { include_images: true, include_drafts: true, include_custom_fields: true, include_empty_categories: true, ..Default::default() };
+    let t = Instant::now();
+    let s = migrate::stage(&a.lock().unwrap(), "src", &mut b.lock().unwrap(), &opts).unwrap();
+    println!("plan in {:?}: {s:?}", t.elapsed());
+    assert!(s.products_create > 100, "{s:?}");
+    assert!(s.warnings.iter().any(|w| w.contains("currencies")), "currency difference noticed: {:?}", s.warnings);
+
+    let t = Instant::now();
+    let r = sync::push(&dst, &b, &MediaSettings::default(), "Migration", no_progress()).await.unwrap();
+    println!("push in {:?}: created {} updated {} failed {} media {} errors {:?}", t.elapsed(), r.created, r.updated, r.failed, r.media_uploaded, r.errors.iter().take(5).collect::<Vec<_>>());
+    // Duplicate source SKUs (left by other tests) can only save once.
+    assert!(r.failed <= s.duplicate_skus.len() * 2, "unexpected failures: {:?}", r.errors.iter().take(10).collect::<Vec<_>>());
+
+    sync::pull(&dst, &b, true, no_progress()).await.unwrap();
+    let v = migrate::verify(&a.lock().unwrap(), &b.lock().unwrap(), &opts).unwrap();
+    println!("verify: checked {} matched {} missing {} differences {} images missing {}", v.checked, v.matched, v.missing.len(), v.differences.len(), v.images_missing);
+    assert!(v.missing.len() <= s.duplicate_skus.len(), "missing: {:?}", v.missing.iter().take(10).collect::<Vec<_>>());
+    assert_eq!(v.images_missing, 0);
+    let dst_cats = b.lock().unwrap().categories().unwrap().len();
+    assert!(dst_cats >= a.lock().unwrap().categories().unwrap().len() - 1, "categories copied");
+
+    // Running it again (skip existing) stages nothing new for products with SKUs.
+    let (again, _) = migrate::plan(&a.lock().unwrap(), "src", &b.lock().unwrap(), &opts).unwrap();
+    assert_eq!(again.products_create, again.no_sku, "{again:?}");
+    assert_eq!(again.categories_create, 0);
+}
