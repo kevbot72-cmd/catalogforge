@@ -416,6 +416,29 @@ fn scan_paths(paths: Vec<String>) -> Vec<LocalFileInfo> {
     out
 }
 
+/// Image locations typed in a spreadsheet. Accepts a missing extension (C:\\Images\\shoe-1 finds shoe-1.jpg).
+#[tauri::command]
+fn resolve_image_paths(paths: Vec<String>) -> Vec<Option<LocalFileInfo>> {
+    const EXTS: [&str; 7] = ["jpg", "jpeg", "png", "webp", "gif", "avif", "JPG"];
+    paths
+        .iter()
+        .map(|p| {
+            let raw = p.trim();
+            let expanded = match raw.strip_prefix("~/") {
+                Some(rest) => std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE")).map(|h| PathBuf::from(h).join(rest))?,
+                None => PathBuf::from(raw),
+            };
+            let found = if expanded.is_file() {
+                Some(expanded.clone())
+            } else {
+                EXTS.iter().map(|e| PathBuf::from(format!("{}.{e}", expanded.display()))).find(|c| c.is_file())
+            }?;
+            let size = std::fs::metadata(&found).map(|m| m.len()).unwrap_or(0);
+            Some(LocalFileInfo { name: found.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(), path: found.to_string_lossy().into_owned(), size })
+        })
+        .collect()
+}
+
 #[tauri::command]
 fn read_file(path: String) -> CmdResult<tauri::ipc::Response> {
     std::fs::read(&path).map(tauri::ipc::Response::new).map_err(err)
@@ -470,6 +493,19 @@ fn set_media_settings(state: State<'_, AppState>, settings: MediaSettings) -> Cm
 #[cfg(test)]
 mod tests {
     #[test]
+    fn resolves_image_locations_with_or_without_extension() {
+        let dir = std::env::temp_dir().join(format!("cf-resolve-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("shoe-1.jpg"), b"x").unwrap();
+        let p = |n: &str| dir.join(n).to_string_lossy().into_owned();
+        let out = super::resolve_image_paths(vec![p("shoe-1.jpg"), p("shoe-1"), p("missing.jpg")]);
+        assert_eq!(out[0].as_ref().unwrap().name, "shoe-1.jpg");
+        assert_eq!(out[1].as_ref().unwrap().path, p("shoe-1.jpg"));
+        assert!(out[2].is_none());
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
     fn decodes_encoded_paths() {
         // encodeURIComponent("C:\\Users\\kevbo\\Documents\\products é.xlsx")
         assert_eq!(super::percent_decode("C%3A%5CUsers%5Ckevbo%5CDocuments%5Cproducts%20%C3%A9.xlsx"), "C:\\Users\\kevbo\\Documents\\products é.xlsx");
@@ -505,7 +541,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             list_stores, add_store, remove_store, local_sites, start_local_site, open_store, pull, query, rows, skus, variations, taxonomy, media, stage, create,
-            remove, undo, discard, summary, changes, resolve_conflict, push, history, history_items, revert, preview, clone_products, scan_paths,
+            remove, undo, discard, summary, changes, resolve_conflict, push, history, history_items, revert, preview, clone_products, scan_paths, resolve_image_paths,
             read_file, write_file, get_media_settings, set_media_settings
         ])
         .run(tauri::generate_context!())

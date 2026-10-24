@@ -1,6 +1,7 @@
 import { AlertCircle, CheckCircle2, Command as CmdIcon, GitCompare, Info, Loader2, Upload, X } from "lucide-react";
 import { useEffect } from "react";
 import { ChangesPanel } from "./components/ChangesPanel";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ProductDrawer } from "./components/ProductDrawer";
 import { Sidebar } from "./components/Sidebar";
 import { Badge, Button, clsx, Empty, ProgressBar, timeAgo } from "./components/ui";
@@ -74,7 +75,7 @@ function Toasts() {
 }
 
 export function App() {
-  const { view, storeId, stores, openDialog, init, setDark } = useApp();
+  const { view, storeId, drawerKey, stores, openDialog, init, setDark } = useApp();
   useEffect(() => {
     let dark = window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
     try {
@@ -99,8 +100,16 @@ export function App() {
                 <p className="mb-3">Sites running in Local are detected automatically. Live stores connect with the CatalogForge Connector plugin or the WooCommerce REST API.</p>
                 <Button variant="primary" onClick={() => openDialog("add-store")}>Add store</Button>
               </Empty>
-            ) : view === "products" ? <ProductsView /> : view === "categories" ? <CategoriesView /> : view === "media" ? <MediaView /> : view === "history" ? <HistoryView /> : <SettingsView />}
-            {view === "products" && <ProductDrawer />}
+            ) : (
+              <ErrorBoundary label={`${view} page`} resetKey={`${storeId}/${view}`}>
+                {view === "products" ? <ProductsView /> : view === "categories" ? <CategoriesView /> : view === "media" ? <MediaView /> : view === "history" ? <HistoryView /> : <SettingsView />}
+              </ErrorBoundary>
+            )}
+            {view === "products" && (
+              <ErrorBoundary label="product editor" resetKey={drawerKey}>
+                <ProductDrawer />
+              </ErrorBoundary>
+            )}
           </main>
           <ChangesPanel />
         </div>

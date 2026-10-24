@@ -747,6 +747,10 @@ export function createDemoBackend(): Backend {
     async filesFromDrop(files) {
       return files.map((f) => ({ path: (f as File & { webkitRelativePath?: string }).webkitRelativePath || f.name, name: f.name, url: URL.createObjectURL(f), size: f.size, file: f }) as LocalFile);
     },
+    async resolveImagePaths(paths) {
+      // A browser cannot read arbitrary locations on disk; the desktop app does.
+      return paths.map(() => null);
+    },
     async getMediaSettings() {
       return settings;
     },

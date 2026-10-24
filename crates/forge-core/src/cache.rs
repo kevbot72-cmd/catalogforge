@@ -605,6 +605,21 @@ impl Cache {
         Ok(out)
     }
 
+    /// What a brand-new product looks like before any field is set, so every field the UI reads exists
+    /// (WooCommerce's own defaults). Display only: push sends just the staged fields.
+    fn blank_product() -> Value {
+        serde_json::to_value(Product {
+            kind: "simple".into(),
+            status: "draft".into(),
+            stock_status: "instock".into(),
+            backorders: "no".into(),
+            tax_status: "taxable".into(),
+            catalog_visibility: "visible".into(),
+            ..Default::default()
+        })
+        .unwrap_or_else(|_| json!({}))
+    }
+
     /// Server record with staged overlay applied.
     fn overlay(base: Option<Value>, key: &str, fields: Option<&BTreeMap<String, (Value, Option<Value>, Option<Value>)>>) -> (Value, RowState) {
         let mut v = base.unwrap_or_else(|| json!({}));
@@ -639,11 +654,16 @@ impl Cache {
                 Ok(id) => stmt.query_row([id], |r| r.get::<_, String>(0)).optional()?.map(|d| pj(&d)),
                 Err(_) => None,
             };
-            let fields = staged.get(&(Entity::Product, key.clone())).or_else(|| staged.get(&(Entity::Variation, key.clone())));
+            let variation = staged.get(&(Entity::Variation, key.clone()));
+            let fields = staged.get(&(Entity::Product, key.clone())).or(variation);
             if base.is_none() && fields.is_none() {
                 continue;
             }
-            let (product, state) = Self::overlay(base, key, fields);
+            let is_new = base.is_none();
+            let (mut product, state) = Self::overlay(base.or_else(|| Some(Self::blank_product())), key, fields);
+            if is_new && variation.is_some() {
+                product["type"] = json!("variation");
+            }
             out.push(ProductRow { product, state });
         }
         Ok(out)
@@ -680,10 +700,7 @@ impl Cache {
         }
         for ((entity, key), fields) in &staged {
             if *entity == Entity::Category && key.starts_with(NEW_PREFIX) {
-                let (mut product, state) = Self::overlay(None, key, Some(fields));
-                if product.get("parent").is_none() {
-                    product["parent"] = json!(0);
-                }
+                let (product, state) = Self::overlay(Some(serde_json::to_value(Category::default())?), key, Some(fields));
                 out.push(ProductRow { product, state });
             }
         }
@@ -706,7 +723,7 @@ impl Cache {
             .collect();
         for ((entity, key), fields) in &staged {
             if matches!(entity, Entity::Product | Entity::Variation) && key.starts_with(NEW_PREFIX) {
-                let (mut v, s) = Self::overlay(None, key, Some(fields));
+                let (mut v, s) = Self::overlay(Some(Self::blank_product()), key, Some(fields));
                 if *entity == Entity::Variation {
                     v["type"] = json!("variation");
                 }
@@ -1072,6 +1089,20 @@ mod tests {
         // deleting a new record just discards it
         c.stage_delete(Entity::Product, &[key]).unwrap();
         assert_eq!(c.summary().unwrap().created, 0);
+    }
+
+    #[test]
+    fn new_products_have_every_field() {
+        let mut c = cache();
+        let key = c.create(Entity::Product, serde_json::from_value(json!({ "name": "New product", "type": "simple" })).unwrap()).unwrap();
+        let row = &c.rows(&[key.clone()]).unwrap()[0];
+        for f in ["gallery_ids", "category_ids", "tags", "attributes", "seo_title", "seo_description", "slug", "catalog_visibility"] {
+            assert!(row.product.get(f).is_some(), "{f} missing on a new product");
+        }
+        assert_eq!(row.product["stock_status"], "instock");
+        assert_eq!(row.state.dirty, vec!["name".to_string(), "type".to_string()], "defaults are not staged");
+        let q = c.query(&ProductQuery::default()).unwrap();
+        assert!(q.keys.contains(&key));
     }
 
     #[test]

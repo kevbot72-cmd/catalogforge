@@ -74,6 +74,9 @@ export function createTauriBackend(): Backend {
       // Native drops arrive through the cf-native-drop bridge; HTML5 File objects have no path here.
       return files.map((f) => ({ path: (f as File & { path?: string }).path ?? f.name, name: f.name, url: URL.createObjectURL(f), size: f.size }));
     },
+    async resolveImagePaths(paths) {
+      return (await invoke<(FileInfo | null)[]>("resolve_image_paths", { paths })).map((f) => (f ? toLocal(f) : null));
+    },
     getMediaSettings: () => invoke("get_media_settings"),
     setMediaSettings: (settings) => invoke("set_media_settings", { settings }),
     onProgress(cb) {

@@ -39,7 +39,7 @@ export const FIELDS: FieldDef[] = [
   { key: "categories", label: "Categories", group: "Organisation", kind: "list", synonyms: ["category", "categories", "collection", "collections", "department", "product category", "category path"] },
   { key: "tags", label: "Tags", group: "Organisation", kind: "list", synonyms: ["tags", "tag", "keywords", "labels"] },
   { key: "featured", label: "Featured", group: "Organisation", kind: "bool", synonyms: ["featured", "is featured"] },
-  { key: "images", label: "Images", group: "Media", kind: "list", synonyms: ["images", "image", "image url", "image urls", "image src", "photo", "photos", "picture", "pictures", "main image", "image file", "variant image"] },
+  { key: "images", label: "Images", group: "Media", kind: "list", synonyms: ["images", "image", "image url", "image urls", "image src", "photo", "photos", "picture", "pictures", "main image", "image file", "variant image", "gallery", "gallery images", "image path", "image paths", "image location", "file location", "file path"] },
   { key: "weight", label: "Weight", group: "Shipping", kind: "decimal", synonyms: ["weight", "variant grams", "weight kg", "weight (kg)", "mass"] },
   { key: "length", label: "Length", group: "Shipping", kind: "decimal", synonyms: ["length", "depth"] },
   { key: "width", label: "Width", group: "Shipping", kind: "decimal", synonyms: ["width"] },
@@ -85,7 +85,8 @@ export interface ImportConfig {
   categoryPathSeparator: string;
   mode: "create_and_update" | "create_only" | "update_only";
   defaultStatus: string;
-  imageMatch: { byColumn: boolean; bySku: boolean };
+  /** byPath: the image column holds full file locations (C:\\Images\\shoe-1.jpg), so no folder is needed. */
+  imageMatch: { byColumn: boolean; bySku: boolean; byPath?: boolean };
   /** Shopify-style "Option1 Name"/"Option1 Value" pairs. */
   optionPairs: { nameColumn: string; valueColumn: string }[];
 }
@@ -142,7 +143,8 @@ export function autoMap(sheet: Sheet): ImportConfig {
         if (score > (best?.score ?? 0)) best = { field: f.key, score };
       }
     }
-    if (best && !used.has(best.field) && best.score >= 0.7) {
+    // Images may span several columns (Image 1, Image 2, …); every other field maps once.
+    if (best && (!used.has(best.field) || best.field === "images") && best.score >= 0.7) {
       used.add(best.field);
       return { column, kind: "field", field: best.field, confidence: best.score };
     }
@@ -184,7 +186,7 @@ export function autoMap(sheet: Sheet): ImportConfig {
     categoryPathSeparator: ">",
     mode: "create_and_update",
     defaultStatus: "publish",
-    imageMatch: { byColumn: true, bySku: true },
+    imageMatch: { byColumn: true, bySku: true, byPath: imageColumnsHavePaths(sheet, mappings) },
     optionPairs,
   };
 }
@@ -221,6 +223,8 @@ export interface PlanContext {
   /** SKU → existing product (from the store cache). */
   existingBySku: Map<string, Product>;
   imageFiles: LocalFile[];
+  /** Full file locations from the image column, resolved on disk (see imagePaths); null when missing. */
+  pathFiles?: Map<string, LocalFile | null>;
   newKey: () => string;
 }
 
@@ -236,6 +240,28 @@ function splitList(v: string, sep: string): string[] {
   if (!s) return [];
   const primary = s.includes(sep) ? s.split(sep) : sep === "|" && !s.includes(">") && s.includes(",") ? s.split(",") : [s];
   return primary.map((x) => x.trim()).filter(Boolean);
+}
+
+/** C:\\…, \\\\server\\…, /… or ~/… — a location on this computer rather than a bare file name. */
+export function isFilePath(v: string): boolean {
+  return /^(?:[a-z]:[\\/]|\\\\|\/|~\/)/i.test(v.trim());
+}
+
+function imageColumns(mappings: ColumnMapping[]): string[] {
+  return mappings.filter((m) => m.kind === "field" && m.field === "images").map((m) => m.column);
+}
+
+function imageColumnsHavePaths(sheet: Sheet, mappings: ColumnMapping[]): boolean {
+  const cols = imageColumns(mappings);
+  return sheet.rows.slice(0, 20).some((r) => cols.some((c) => imageTokens(r[c] ?? "").some(isFilePath)));
+}
+
+/** Every file location in the image column(s), for the backend to look up before planning. */
+export function imagePaths(sheet: Sheet, cfg: ImportConfig): string[] {
+  const out = new Set<string>();
+  const cols = imageColumns(cfg.mappings);
+  for (const r of sheet.rows) for (const c of cols) for (const t of imageTokens(r[c] ?? "")) if (isFilePath(t)) out.add(t);
+  return [...out];
 }
 
 function imageTokens(v: string): string[] {
@@ -428,12 +454,19 @@ export function buildPlan(sheet: Sheet, cfg: ImportConfig, ctx: PlanContext): Pl
     return f;
   };
 
+  // Several columns may be mapped to Images (Image 1, Image 2, …); they are read in order.
+  const imageCols = imageColumns(cfg.mappings);
   const resolveImages = (row: Record<string, string>, rowNo: number, sku: string, it: PlannedProduct) => {
     const out: MediaRef[] = [];
     if (cfg.imageMatch.byColumn && fieldCols.has("images")) {
-      for (const tok of imageTokens(valueOf(row, "images"))) {
+      const raw = imageCols.length > 1 ? imageCols.map((c) => row[c] ?? "").join("|") : valueOf(row, "images");
+      for (const tok of imageTokens(raw)) {
         if (/^https?:\/\//i.test(tok)) out.push({ url: tok });
-        else {
+        else if (cfg.imageMatch.byPath && isFilePath(tok)) {
+          const file = ctx.pathFiles?.get(tok);
+          if (file) out.push({ file: file.path, preview: file.url });
+          else it.issues.push({ level: "warning", row: rowNo, field: "images", message: `Image file not found: ${tok}` });
+        } else {
           const want = tok.split(/[\\/]/).pop()!.toLowerCase();
           const file = ctx.imageFiles.find((f) => f.name.toLowerCase() === want) ?? ctx.imageFiles.find((f) => stem(f.name) === stem(want));
           if (file) out.push({ file: file.path, preview: file.url });

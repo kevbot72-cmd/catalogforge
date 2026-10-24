@@ -399,6 +399,8 @@ export interface Backend {
   saveFile(opts: { defaultName: string; filterName: string; extension: string; bytes: Uint8Array; mime: string }): Promise<string | null>;
   /** Turns files dropped on the window into LocalFiles (paths on desktop, object URLs in the browser). */
   filesFromDrop(files: File[]): Promise<LocalFile[]>;
+  /** Looks up image file locations from a spreadsheet; a location without an extension finds name.jpg/.png/…. Null where missing. */
+  resolveImagePaths(paths: string[]): Promise<(LocalFile | null)[]>;
   getMediaSettings(): Promise<MediaSettings>;
   setMediaSettings(s: MediaSettings): Promise<void>;
   onProgress(cb: (storeId: string, p: Progress) => void): () => void;

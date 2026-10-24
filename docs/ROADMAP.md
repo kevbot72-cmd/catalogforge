@@ -22,6 +22,11 @@ Measured on the test machine (PHP built-in server, untuned MariaDB, so real host
 | Pull via connector | ~740 products/s |
 | Pull via direct MySQL / Local | ~5,800 products/s (6,695 products in 1.2 s) |
 
+## Fixed in 0.1.2
+
+- **Crash on a new product's Media, Organisation and SEO tabs.** A product created in the app had only the fields you'd set, so those tabs had nothing to show and the window went blank. New products now start with WooCommerce's defaults for every field. Any display error is now contained to the panel it happens in, with a "Try again" button, instead of blanking the window.
+- **Import images from file locations.** Tick **Use file locations from the image column** to import from paths such as `C:\Images\shoe-1.jpg|C:\Images\shoe-2.jpg`, with no folder to pick. The extension may be left off, several images can share one cell (separated by `|`) or go in separate Image 1 / Image 2 columns, and the first becomes the featured image while the rest go to the gallery. Missing files are listed on the review step.
+
 ## Fixed in 0.1.1
 
 - **Grey/blank product images on Windows + Local.** Images written directly into a Local site were registered with an absolute disk path, because WordPress on Windows spells its uploads folder with mixed slashes, so browsers couldn't load them. The connector now always stores uploads-relative paths and **automatically repairs** images pushed by 0.1.0 the first time the updated plugin runs. Pushes now also spot-check that the store serves uploaded images, and warn with the failing URL if it doesn't.

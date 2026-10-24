@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { autoMap, buildPlan, matchImagesBySku, parseCsv, planToStaging, type PlanContext } from "./importer";
+import { autoMap, buildPlan, imagePaths, matchImagesBySku, parseCsv, planToStaging, type PlanContext } from "./importer";
 import type { Category, LocalFile, Product } from "../backend/types";
 
 let n = 0;
@@ -102,5 +102,32 @@ describe("plan", () => {
     expect(plan.issues.some((i) => i.level === "error" && /Duplicate SKU/.test(i.message))).toBe(true);
     const staged = planToStaging(plan, new Map());
     expect(staged.creates.length).toBe(1);
+  });
+
+  it("uses full file locations: first is featured, the rest gallery", () => {
+    const csv = "Name,SKU,Images,Image 2\nShoe,SH-1,C:\\Pics\\shoe-front|C:\\Pics\\shoe-side.jpg,C:\\Pics\\shoe-back.png\nBoot,BT-1,D:\\missing.jpg,";
+    const sheet = parseCsv(csv);
+    const cfg = autoMap(sheet);
+    expect(cfg.imageMatch.byPath).toBe(true);
+    expect(cfg.mappings.filter((m) => m.field === "images").map((m) => m.column)).toEqual(["Images", "Image 2"]);
+    expect(imagePaths(sheet, cfg)).toEqual(["C:\\Pics\\shoe-front", "C:\\Pics\\shoe-side.jpg", "C:\\Pics\\shoe-back.png", "D:\\missing.jpg"]);
+    const f = (path: string): LocalFile => ({ path, name: path.split("\\").pop()!, url: `asset://${path}`, size: 1 });
+    const pathFiles = new Map<string, LocalFile | null>([
+      ["C:\\Pics\\shoe-front", f("C:\\Pics\\shoe-front.jpg")],
+      ["C:\\Pics\\shoe-side.jpg", f("C:\\Pics\\shoe-side.jpg")],
+      ["C:\\Pics\\shoe-back.png", f("C:\\Pics\\shoe-back.png")],
+      ["D:\\missing.jpg", null],
+    ]);
+    const plan = buildPlan(sheet, cfg, ctx({ pathFiles }));
+    const shoe = plan.products.find((p) => p.fields.sku === "SH-1")!;
+    expect(shoe.fields.image_id).toMatchObject({ file: "C:\\Pics\\shoe-front.jpg" });
+    expect((shoe.fields.gallery_ids as { file: string }[]).map((g) => g.file)).toEqual(["C:\\Pics\\shoe-side.jpg", "C:\\Pics\\shoe-back.png"]);
+    const boot = plan.products.find((p) => p.fields.sku === "BT-1")!;
+    expect(boot.issues.some((i) => i.message.includes("D:\\missing.jpg"))).toBe(true);
+  });
+
+  it("leaves bare file names to folder matching", () => {
+    const sheet = parseCsv("Name,SKU,Image\nMug,M-1,mug.jpg");
+    expect(autoMap(sheet).imageMatch.byPath).toBe(false);
   });
 });

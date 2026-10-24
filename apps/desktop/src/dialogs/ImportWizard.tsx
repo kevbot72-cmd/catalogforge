@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import type { LocalFile, Product } from "../backend/types";
 import { isTauri, readLocalFile } from "../backend/tauri";
 import { Badge, Button, clsx, Dropzone, Field, Input, Modal, Select, Toggle } from "../components/ui";
-import { autoMap, buildPlan, FIELDS, parseCsv, parseFile, planToStaging, type ColumnMapping, type ImportConfig, type Plan, type Sheet } from "../lib/importer";
+import { autoMap, buildPlan, FIELDS, imagePaths, parseCsv, parseFile, planToStaging, type ColumnMapping, type ImportConfig, type Plan, type Sheet } from "../lib/importer";
 import { useApp } from "../store/app";
 
 type Step = "source" | "map" | "review";
@@ -107,8 +107,15 @@ export function ImportWizard() {
         byKey.set(r._state.key, r);
       }
       setExisting(byKey);
+      // Full file locations in the image column are checked on disk up front.
+      const pathFiles = new Map<string, LocalFile | null>();
+      if (cfg.imageMatch.byColumn && cfg.imageMatch.byPath) {
+        const paths = imagePaths(sheet, cfg);
+        const found = paths.length ? await backend.resolveImagePaths(paths) : [];
+        paths.forEach((p, i) => pathFiles.set(p, found[i]));
+      }
       let n = 0;
-      const p = buildPlan(sheet, cfg, { categories: (taxonomy?.categories ?? []).filter((c) => !c._state.is_new), existingBySku: bySku, imageFiles: images, newKey: () => `new:imp${Date.now().toString(36)}${(n++).toString(36)}` });
+      const p = buildPlan(sheet, cfg, { categories: (taxonomy?.categories ?? []).filter((c) => !c._state.is_new), existingBySku: bySku, imageFiles: images, pathFiles, newKey: () => `new:imp${Date.now().toString(36)}${(n++).toString(36)}` });
       setPlan(p);
       setStep("review");
     } finally {
@@ -174,7 +181,7 @@ export function ImportWizard() {
               <div className={clsx("flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-8 text-center", images.length ? "border-added/50 bg-added/5" : "border-line")}>
                 <Images size={28} className={images.length ? "text-added" : "text-muted"} />
                 <div className="font-medium">{images.length ? `${images.length.toLocaleString()} images ready` : "Add product images (optional)"}</div>
-                <div className="text-xs text-muted">Matched by file name in an image column, or automatically by SKU: <code>SKU.jpg</code>, <code>SKU-2.jpg</code>, <code>SKU_back.png</code></div>
+                <div className="text-xs text-muted">Matched by file name in an image column, or automatically by SKU: <code>SKU.jpg</code>, <code>SKU-2.jpg</code>, <code>SKU_back.png</code>. Not needed if your sheet has full file locations like <code>C:\Images\shoe-1.jpg</code>.</div>
                 <Button size="sm" icon={<FolderOpen size={13} />} onClick={async () => {
                   const files = await backend.pickFiles({ directory: true });
                   setImages((cur) => [...cur, ...files.filter((f) => /\.(jpe?g|png|webp|gif|avif)$/i.test(f.name))]);
@@ -224,9 +231,19 @@ export function ImportWizard() {
               </div>
             </Field>
           </div>
-          <div className="flex gap-6">
-            <Toggle checked={cfg.imageMatch.byColumn} onChange={(v) => setCfg({ ...cfg, imageMatch: { ...cfg.imageMatch, byColumn: v } })} label="Images from image column (URLs or file names)" />
-            <Toggle checked={cfg.imageMatch.bySku} onChange={(v) => setCfg({ ...cfg, imageMatch: { ...cfg.imageMatch, bySku: v } })} label={`Match images by SKU (${images.length} in folder)`} />
+          <div className="space-y-2">
+            <div className="flex flex-wrap gap-x-6 gap-y-2">
+              <Toggle checked={cfg.imageMatch.byColumn} onChange={(v) => setCfg({ ...cfg, imageMatch: { ...cfg.imageMatch, byColumn: v } })} label="Images from image column (URLs or file names)" />
+              <Toggle checked={cfg.imageMatch.bySku} onChange={(v) => setCfg({ ...cfg, imageMatch: { ...cfg.imageMatch, bySku: v } })} label={`Match images by SKU (${images.length} in folder)`} />
+            </div>
+            {cfg.imageMatch.byColumn && (
+              <div data-testid="import-bypath">
+                <Toggle checked={!!cfg.imageMatch.byPath} onChange={(v) => setCfg({ ...cfg, imageMatch: { ...cfg.imageMatch, byPath: v } })} label="Use file locations from the image column" />
+                <div className="ml-10 mt-0.5 text-xs text-muted">
+                  e.g. <code>C:\Images\shoe-1.jpg|C:\Images\shoe-2.jpg</code>. Separate several images with <code>|</code>, or use one column per image (Image 1, Image 2…). The first image becomes the featured image, the rest go to the gallery.
+                </div>
+              </div>
+            )}
           </div>
           <div className="overflow-hidden rounded-lg border border-line">
             <table className="w-full text-[13px]">
