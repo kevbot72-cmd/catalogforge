@@ -460,6 +460,33 @@ fn resolve_image_paths(paths: Vec<String>) -> Vec<Option<LocalFileInfo>> {
         .collect()
 }
 
+/// A product photo for a catalogue PDF: downloaded (http/https) or read from disk, then shrunk to
+/// an upright JPEG of at most `max` px.
+#[tauri::command]
+async fn catalogue_image(src: String, max: u32, quality: u8) -> CmdResult<tauri::ipc::Response> {
+    static CLIENT: std::sync::OnceLock<reqwest::Client> = std::sync::OnceLock::new();
+    let bytes = if src.starts_with("http://") || src.starts_with("https://") {
+        let client = CLIENT.get_or_init(|| {
+            reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(45))
+                // Local sites use self-signed certificates; these are public product images.
+                .danger_accept_invalid_certs(true)
+                .user_agent(concat!("CatalogForge/", env!("CARGO_PKG_VERSION")))
+                .build()
+                .expect("http client")
+        });
+        let res = client.get(&src).send().await.map_err(err)?;
+        if !res.status().is_success() {
+            return Err(format!("{} returned {}", src, res.status()));
+        }
+        res.bytes().await.map_err(err)?.to_vec()
+    } else {
+        tokio::fs::read(&src).await.map_err(err)?
+    };
+    let jpeg = tokio::task::spawn_blocking(move || forge_core::media::print_jpeg(&bytes, max.clamp(64, 4000), quality)).await.map_err(err)?.map_err(err)?;
+    Ok(tauri::ipc::Response::new(jpeg))
+}
+
 #[tauri::command]
 fn read_file(path: String) -> CmdResult<tauri::ipc::Response> {
     std::fs::read(&path).map(tauri::ipc::Response::new).map_err(err)
@@ -562,7 +589,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             list_stores, add_store, remove_store, local_sites, start_local_site, open_store, pull, query, rows, skus, variations, taxonomy, media, stage, create,
-            remove, undo, discard, summary, changes, resolve_conflict, push, history, history_items, revert, preview, clone_products, scan_paths, resolve_image_paths, meta_keys, set_custom_fields,
+            remove, undo, discard, summary, changes, resolve_conflict, push, history, history_items, revert, preview, clone_products, scan_paths, resolve_image_paths, meta_keys, set_custom_fields, catalogue_image,
             read_file, write_file, get_media_settings, set_media_settings
         ])
         .run(tauri::generate_context!())

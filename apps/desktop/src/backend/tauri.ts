@@ -79,6 +79,15 @@ export function createTauriBackend(): Backend {
     },
     getMediaSettings: () => invoke("get_media_settings"),
     metaKeys: (id) => invoke("meta_keys", { id }),
+    async printImage(src, max, quality) {
+      try {
+        return new Uint8Array(await invoke<ArrayBuffer>("catalogue_image", { src, max, quality }));
+      } catch (e) {
+        console.warn("catalogue image", src, e);
+        return null;
+      }
+    },
+    readFile: async (path) => new Uint8Array(await invoke<ArrayBuffer>("read_file", { path })),
     setCustomFields: (id, fields) => invoke("set_custom_fields", { id, fields }),
     setMediaSettings: (settings) => invoke("set_media_settings", { settings }),
     onProgress(cb) {

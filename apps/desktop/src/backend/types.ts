@@ -426,6 +426,10 @@ export interface Backend {
   getMediaSettings(): Promise<MediaSettings>;
   setMediaSettings(s: MediaSettings): Promise<void>;
   onProgress(cb: (storeId: string, p: Progress) => void): () => void;
+  /** A product photo as an upright JPEG of at most `maxPx` (store URL, local file path or preview URL), or null. */
+  printImage(src: string, maxPx: number, quality: number): Promise<Uint8Array | null>;
+  /** Bytes of a file the user picked (template PDF, logo, font). */
+  readFile(path: string): Promise<Uint8Array>;
   /** Plugin fields found on the store's products. */
   metaKeys(id: string): Promise<MetaKeyInfo[]>;
   /** Saves which plugin fields this store manages (then pull with full=true to load them). */

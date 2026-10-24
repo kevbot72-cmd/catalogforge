@@ -229,6 +229,24 @@ fn decode_upright(source: &[u8]) -> Result<DynamicImage> {
     Ok(img)
 }
 
+/// Re-encodes any supported image as an upright JPEG no larger than `max` px on its longest edge,
+/// with transparency flattened onto white. Used to embed product photos in catalogue PDFs.
+pub fn print_jpeg(source: &[u8], max: u32, quality: u8) -> Result<Vec<u8>> {
+    let img = decode_upright(source)?;
+    let (w, h) = img.dimensions();
+    let img = if w.max(h) > max { img.resize(max, max, FilterType::Triangle) } else { img };
+    let rgba = img.to_rgba8();
+    let mut rgb = image::RgbImage::new(rgba.width(), rgba.height());
+    for (x, y, p) in rgba.enumerate_pixels() {
+        let a = p[3] as u32;
+        let blend = |c: u8| ((c as u32 * a + 255 * (255 - a)) / 255) as u8;
+        rgb.put_pixel(x, y, image::Rgb([blend(p[0]), blend(p[1]), blend(p[2])]));
+    }
+    let mut out = Vec::new();
+    image::codecs::jpeg::JpegEncoder::new_with_quality(&mut out, quality.clamp(30, 100)).encode_image(&rgb)?;
+    Ok(out)
+}
+
 /// Prepares one image from raw bytes. `stem` is the already-rendered file name without extension.
 pub fn prepare(source: &[u8], stem: &str, sizes: &[ImageSize], settings: &MediaSettings) -> Result<PreparedImage> {
     let source_format = image::guess_format(source).ok();
@@ -304,6 +322,20 @@ pub fn scan_folder(dir: &Path) -> Vec<std::path::PathBuf> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn print_jpeg_shrinks_and_flattens() {
+        let mut img = image::RgbaImage::new(2000, 1000);
+        for p in img.pixels_mut() {
+            *p = image::Rgba([255, 0, 0, 0]);
+        }
+        let mut png = Vec::new();
+        DynamicImage::ImageRgba8(img).write_to(&mut std::io::Cursor::new(&mut png), ImageFormat::Png).unwrap();
+        let jpg = super::print_jpeg(&png, 800, 80).unwrap();
+        let out = image::load_from_memory(&jpg).unwrap();
+        assert_eq!(out.dimensions(), (800, 400));
+        assert!(out.to_rgb8().get_pixel(10, 10)[1] > 240, "transparent pixels become white");
+    }
+
     use super::*;
 
     #[test]

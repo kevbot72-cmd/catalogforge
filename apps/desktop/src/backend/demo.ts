@@ -187,6 +187,8 @@ const DEFAULT_SETTINGS: MediaSettings = { format: "webp", quality: 82, max_dimen
 
 export function createDemoBackend(): Backend {
   const stores = new Map<string, StoreData>();
+  /** Files picked in this session, by the name used as their path. */
+  const picked = new Map<string, File>();
   const listeners = new Set<(id: string, p: Progress) => void>();
   let settings = { ...DEFAULT_SETTINGS };
   const emit = (id: string, p: Progress) => listeners.forEach((l) => l(id, p));
@@ -751,11 +753,38 @@ export function createDemoBackend(): Backend {
       return defaultName;
     },
     async filesFromDrop(files) {
+      for (const f of files) picked.set((f as File & { webkitRelativePath?: string }).webkitRelativePath || f.name, f);
       return files.map((f) => ({ path: (f as File & { webkitRelativePath?: string }).webkitRelativePath || f.name, name: f.name, url: URL.createObjectURL(f), size: f.size, file: f }) as LocalFile);
     },
     async resolveImagePaths(paths) {
       // A browser cannot read arbitrary locations on disk; the desktop app does.
       return paths.map(() => null);
+    },
+    async printImage(src, max, quality) {
+      // Browsers can only rasterise what they can load (data:, blob: and same-origin URLs).
+      try {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.src = picked.get(src) ? URL.createObjectURL(picked.get(src)!) : src;
+        await img.decode();
+        const scale = Math.min(1, max / Math.max(img.naturalWidth || max, img.naturalHeight || max));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round((img.naturalWidth || max) * scale));
+        canvas.height = Math.max(1, Math.round((img.naturalHeight || max) * scale));
+        const ctx = canvas.getContext("2d")!;
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", quality / 100));
+        return blob ? new Uint8Array(await blob.arrayBuffer()) : null;
+      } catch {
+        return null;
+      }
+    },
+    async readFile(path) {
+      const f = picked.get(path);
+      if (!f) throw new Error(`File not available: ${path}`);
+      return new Uint8Array(await f.arrayBuffer());
     },
     async metaKeys(id) {
       const s = S(id);

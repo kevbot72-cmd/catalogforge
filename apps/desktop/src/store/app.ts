@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import type { Backend, Edit, Entity, Media, ProductQuery, Progress, StagedSummary, StoreInfo, StoreProfile, TaxonomyData } from "../backend/types";
 
-export type View = "products" | "categories" | "media" | "history" | "settings";
+export type View = "products" | "categories" | "media" | "catalogue" | "history" | "settings";
 export type Dialog = null | "add-store" | "import" | "export" | "mass-change" | "clone" | "variations" | "palette";
 
 export interface Toast {

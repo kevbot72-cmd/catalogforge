@@ -16,9 +16,9 @@ page.on("pageerror", (e) => errors.push(String(e)));
 page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
 
 let failed = 0;
-async function step(name, fn) {
+async function step(name, fn, timeout = 60000) {
   try {
-    await Promise.race([fn(), new Promise((_, rej) => setTimeout(() => rej(new Error("step timed out after 60s")), 60000))]);
+    await Promise.race([fn(), new Promise((_, rej) => setTimeout(() => rej(new Error(`step timed out after ${timeout / 1000}s`)), timeout))]);
     console.log("  ok  ", name);
   } catch (e) {
     failed++;
@@ -298,6 +298,48 @@ await step("a new product's Media, Organisation and SEO tabs render", async () =
   }
   await page.getByLabel("Close drawer").click();
 });
+
+await step("catalogue: leave out a category, restyle, use a PDF template and create the PDF", async () => {
+  const pages = async () => Number(await page.getByTestId("pdf-preview").getAttribute("data-pages"));
+  const stats = () => page.getByTestId("catalogue-stats").innerText();
+  await page.getByTestId("nav-catalogue").click();
+  await page.waitForFunction(() => Number(document.querySelector('[data-testid="pdf-preview"]')?.getAttribute("data-pages")) > 3, null, { timeout: 60000 });
+  const before = await stats();
+  await page.getByLabel("Leave out Home").check();
+  await page.waitForFunction((b) => document.querySelector('[data-testid="catalogue-stats"]')?.textContent !== b, before.replace(/\n/g, ""), { timeout: 10000 }).catch(() => {});
+  expect((await stats()) !== before, "leaving out a category changes the catalogue");
+  expect((await stats()).includes("3 categories"), `expected 3 categories, got ${await stats()}`);
+  await page.getByRole("tab", { name: "Layout" }).click();
+  await page.getByTestId("layout-list").click();
+  await page.getByRole("tab", { name: "Cover" }).click();
+  await page.getByTestId("cover-texts-title").fill("Spring Collection");
+  await page.getByRole("tab", { name: "Headers" }).click();
+  await page.getByTestId("header-left").fill("{store} · {category}");
+  // A 4-page template PDF made on the fly.
+  const { PDFDocument, rgb } = await import("pdf-lib");
+  const tpl = await PDFDocument.create();
+  for (const c of [rgb(0.1, 0.2, 0.4), rgb(0.9, 0.9, 1), rgb(1, 0.95, 0.9), rgb(0.9, 1, 0.95)]) tpl.addPage([595.28, 841.89]).drawRectangle({ x: 0, y: 0, width: 595.28, height: 40, color: c });
+  const { writeFileSync, readFileSync } = await import("node:fs");
+  const tplPath = `${SHOTS}template.pdf`;
+  writeFileSync(tplPath, await tpl.save());
+  await page.getByRole("tab", { name: "Template" }).click();
+  const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.getByTestId("template-pick").click()]);
+  await chooser.setFiles(tplPath);
+  await page.getByText("Template loaded · 4 pages").waitFor();
+  await page.waitForTimeout(2500);
+  expect((await pages()) > 3, "preview re-rendered with the template");
+  await shot("19-catalogue");
+  const t0 = Date.now();
+  const [download] = await Promise.all([page.waitForEvent("download", { timeout: 240000 }), page.getByTestId("catalogue-export").click()]);
+  console.log(`        full catalogue PDF in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+  expect(/\.pdf$/.test(download.suggestedFilename()), `unexpected name ${download.suggestedFilename()}`);
+  const bytes = readFileSync(await download.path());
+  expect(bytes.subarray(0, 5).toString() === "%PDF-", "a PDF file");
+  const out = await PDFDocument.load(bytes);
+  expect(out.getPageCount() > 20, `full PDF has every page (${out.getPageCount()})`);
+  expect(out.getTitle() === "Spring Collection", `title from the cover (${out.getTitle()})`);
+  console.log(`        ${out.getPageCount()} pages, ${(bytes.length / 1048576).toFixed(1)} MB`);
+}, 300000);
 
 await step("dark mode", async () => {
   await page.getByTestId("nav-products").click();
