@@ -1,6 +1,7 @@
 import { FileSpreadsheet, FileText, Loader2 } from "lucide-react";
 import { useState } from "react";
-import { ALL_COLUMNS, VIEW_PRESETS, type ColumnDef } from "../components/ProductGrid";
+import { columnsFor, presetsFor, type ColumnDef } from "../components/ProductGrid";
+import type { CustomField } from "../backend/types";
 import { Button, clsx, Field, Modal, Select, Toggle } from "../components/ui";
 import { buildExport, type ExportColumn, type ExportFormat } from "../lib/exporter";
 import { useApp } from "../store/app";
@@ -13,15 +14,17 @@ const EXTRA: ExportColumn[] = [
   { id: "gallery_ids", title: "Gallery IDs" },
 ];
 
-function currentColumns(): ColumnDef[] {
-  let ids: string[] = VIEW_PRESETS.Default;
+function currentColumns(fields?: CustomField[]): ColumnDef[] {
+  const presets = presetsFor(fields);
+  const all = columnsFor(fields);
+  let ids: string[] = presets.Default;
   try {
     const preset = localStorage.getItem("cf.preset") ?? "Default";
-    ids = preset === "Custom" ? JSON.parse(localStorage.getItem("cf.columns") ?? "null") ?? ids : VIEW_PRESETS[preset] ?? ids;
+    ids = preset === "Custom" ? JSON.parse(localStorage.getItem("cf.columns") ?? "null") ?? ids : presets[preset] ?? ids;
   } catch {
     /* defaults */
   }
-  return ids.map((id) => ALL_COLUMNS.find((c) => c.id === id)!).filter(Boolean);
+  return ids.map((id) => all.find((c) => c.id === id)!).filter(Boolean);
 }
 
 export function ExportDialog() {
@@ -46,7 +49,8 @@ export function ExportDialog() {
         const seen = new Set(rows.map((r) => r._state.key));
         rows = [...rows, ...extra.filter((v) => !seen.has(v._state.key))];
       }
-      const defs = (columns === "view" ? currentColumns() : ALL_COLUMNS).filter((c) => c.title && c.kind !== "expander" && c.kind !== "image");
+      const fields = info?.profile.custom_fields;
+      const defs = (columns === "view" ? currentColumns(fields) : columnsFor(fields)).filter((c) => c.title && c.kind !== "expander" && c.kind !== "image");
       const cols: ExportColumn[] = [
         ...defs.map((c) => ({ id: c.id, title: c.title === "L" ? "Length" : c.title === "W" ? "Width" : c.title === "H" ? "Height" : c.title, numeric: NUMERIC.has(c.kind) || c.id === "id" })),
         ...(columns === "all" ? EXTRA.filter((e) => !defs.some((d) => d.id === e.id)) : []),

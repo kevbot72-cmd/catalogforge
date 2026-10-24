@@ -4,7 +4,7 @@ import type { Edit, ProductRow } from "../backend/types";
 import { CategoryPicker, TagInput } from "../components/fields";
 import { Badge, Button, Field, formatValue, Input, Modal, Select, Toggle } from "../components/ui";
 import { FUNCTION_HELP } from "../lib/formula";
-import { applyMass, isApplicable, MASS_FIELDS, OPS_BY_KIND, type MassOp, type OpId } from "../lib/massChange";
+import { applyMass, isApplicable, massFieldsFor, OPS_BY_KIND, type MassOp, type OpId } from "../lib/massChange";
 import { useApp } from "../store/app";
 
 export function MassChangeDialog() {
@@ -13,7 +13,8 @@ export function MassChangeDialog() {
   const [scope, setScope] = useState<"selection" | "filtered">("filtered");
   const [withVariations, setWithVariations] = useState(true);
   const [fieldKey, setFieldKey] = useState("regular_price");
-  const field = MASS_FIELDS.find((f) => f.key === fieldKey)!;
+  const MASS_FIELDS = massFieldsFor(useApp((s) => s.info?.profile.custom_fields));
+  const field = MASS_FIELDS.find((f) => f.key === fieldKey) ?? MASS_FIELDS[0];
   const [op, setOp] = useState<OpId>("inc_pct");
   const [value, setValue] = useState("");
   const [value2, setValue2] = useState("");

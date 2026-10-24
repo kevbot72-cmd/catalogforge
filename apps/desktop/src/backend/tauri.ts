@@ -78,6 +78,8 @@ export function createTauriBackend(): Backend {
       return (await invoke<(FileInfo | null)[]>("resolve_image_paths", { paths })).map((f) => (f ? toLocal(f) : null));
     },
     getMediaSettings: () => invoke("get_media_settings"),
+    metaKeys: (id) => invoke("meta_keys", { id }),
+    setCustomFields: (id, fields) => invoke("set_custom_fields", { id, fields }),
     setMediaSettings: (settings) => invoke("set_media_settings", { settings }),
     onProgress(cb) {
       let un: (() => void) | undefined;

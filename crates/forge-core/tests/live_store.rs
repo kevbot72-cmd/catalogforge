@@ -339,3 +339,60 @@ async fn throughput_bulk_create_and_pull() {
         mr.products as f64 / mysql_s
     );
 }
+
+#[tokio::test]
+async fn custom_fields_discover_edit_push_and_conflict() {
+    let Some(driver) = connector() else { return eprintln!("CF_TEST_URL not set; skipping") };
+    let s = sfx();
+    let (brand, qty) = (format!("cf_brand_{s}"), format!("cf_pack_qty_{s}"));
+    let tmp = tempfile::tempdir().unwrap();
+    let cache = Mutex::new(Cache::open(&tmp.path().join("c.db")).unwrap());
+
+    // A product carrying two plugin fields, created through the app itself.
+    let key = cache
+        .lock()
+        .unwrap()
+        .create(Entity::Product, obj(json!({ "name": format!("Meta Mug {s}"), "type": "simple", "sku": format!("META-{s}"), "status": "publish", format!("meta:{brand}"): "Acme", format!("meta:{qty}"): 6 })))
+        .unwrap();
+    let report = sync::push(&driver, &cache, &MediaSettings::default(), "Custom fields", no_progress()).await.unwrap();
+    assert!(report.errors.is_empty(), "{:?}", report.errors);
+    let id = cache.lock().unwrap().query(&ProductQuery { search: format!("META-{s}"), ..Default::default() }).unwrap().keys[0].parse::<i64>().unwrap();
+    assert_ne!(key, id.to_string());
+
+    // Discovery: both the connector and the direct database reader find the fields.
+    let found = driver.meta_keys().await.unwrap();
+    let b = found.iter().find(|m| m.key == brand).expect("brand discovered");
+    assert_eq!((b.sample.as_str(), b.kind.as_str()), ("Acme", "text"));
+    assert_eq!(found.iter().find(|m| m.key == qty).unwrap().kind, "number");
+    assert!(!found.iter().any(|m| m.key == "_sku" || m.key == "_price"), "built-in keys are hidden");
+    let reader = MysqlDriver::connect(&mysql_target(), None).await.unwrap();
+    assert!(reader.meta_keys().await.unwrap().iter().any(|m| m.key == brand));
+
+    // Reading: with the keys selected, products carry them as meta:<key> fields.
+    for d in [&driver as &dyn Driver, &reader] {
+        d.set_meta_keys(vec![brand.clone(), qty.clone()]);
+    }
+    sync::pull(&driver, &cache, true, no_progress()).await.unwrap();
+    let row = cache.lock().unwrap().rows(&[id.to_string()]).unwrap().remove(0);
+    assert_eq!(row.product[format!("meta:{brand}")], "Acme");
+    assert_eq!(row.product[format!("meta:{qty}")], "6");
+    let from_db = reader.catalog_by_ids(&[id]).await.unwrap().products.remove(0);
+    assert_eq!(from_db.meta.get(&brand), Some(&json!("Acme")), "MySQL reader matches the connector");
+
+    // Editing and pushing a custom field.
+    cache.lock().unwrap().stage(&[Edit { entity: Entity::Product, key: id.to_string(), field: format!("meta:{brand}"), value: Some(json!("Zenith")) }]).unwrap();
+    let report = sync::push(&driver, &cache, &MediaSettings::default(), "Brand", no_progress()).await.unwrap();
+    assert_eq!((report.updated, report.conflicts), (1, 0), "{report:?}");
+    assert_eq!(reader.catalog_by_ids(&[id]).await.unwrap().products[0].meta.get(&brand), Some(&json!("Zenith")));
+
+    // Conflict: someone else changes the field after our pull.
+    let other = Mutex::new(Cache::open(&tmp.path().join("other.db")).unwrap());
+    sync::pull(&driver, &other, true, no_progress()).await.unwrap();
+    cache.lock().unwrap().stage(&[Edit { entity: Entity::Product, key: id.to_string(), field: format!("meta:{brand}"), value: Some(json!("Mine")) }]).unwrap();
+    other.lock().unwrap().stage(&[Edit { entity: Entity::Product, key: id.to_string(), field: format!("meta:{brand}"), value: Some(json!("Theirs")) }]).unwrap();
+    sync::push(&driver, &other, &MediaSettings::default(), "Theirs", no_progress()).await.unwrap();
+    assert_eq!(cache.lock().unwrap().changes().unwrap()[0].base, json!("Zenith"), "the pushed value is the new base");
+    let report = sync::push(&driver, &cache, &MediaSettings::default(), "Mine", no_progress()).await.unwrap();
+    assert_eq!(report.conflicts, 1, "{report:?}");
+    assert_eq!(reader.catalog_by_ids(&[id]).await.unwrap().products[0].meta.get(&brand), Some(&json!("Theirs")));
+}

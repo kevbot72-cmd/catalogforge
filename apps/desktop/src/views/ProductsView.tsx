@@ -1,6 +1,6 @@
 import { Columns3, Copy, Download, FileUp, Plus, RefreshCw, Search, Sparkles, Trash2, Undo2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { ALL_COLUMNS, ProductGrid, VIEW_PRESETS } from "../components/ProductGrid";
+import { columnsFor, presetsFor, ProductGrid } from "../components/ProductGrid";
 import { Button, clsx, Input, Select } from "../components/ui";
 import { useApp } from "../store/app";
 
@@ -34,8 +34,11 @@ export function ProductsView() {
     const t = setTimeout(() => search !== (query.search ?? "") && setQuery({ search }), 200);
     return () => clearTimeout(t);
   }, [search, query.search, setQuery]);
-  const columnIds = preset === "Custom" && custom ? custom : VIEW_PRESETS[preset] ?? VIEW_PRESETS.Default;
-  const columns = useMemo(() => columnIds.map((id) => ALL_COLUMNS.find((c) => c.id === id)!).filter(Boolean), [columnIds]);
+  const fields = info?.profile.custom_fields;
+  const allColumns = useMemo(() => columnsFor(fields), [fields]);
+  const presets = useMemo(() => presetsFor(fields), [fields]);
+  const columnIds = preset === "Custom" && custom ? custom : presets[preset] ?? presets.Default;
+  const columns = useMemo(() => columnIds.map((id) => allColumns.find((c) => c.id === id)!).filter(Boolean), [columnIds, allColumns]);
   const savePreset = (p: string) => {
     setPreset(p);
     try {
@@ -89,12 +92,12 @@ export function ProductsView() {
             <div className="absolute right-0 z-40 mt-1 w-64 rounded-lg border border-line bg-panel p-2 shadow-xl" onMouseLeave={() => setPicker(false)}>
               <div className="mb-1 px-1 text-2xs font-semibold uppercase text-muted">Saved views</div>
               <div className="mb-2 flex flex-wrap gap-1">
-                {Object.keys(VIEW_PRESETS).map((p) => <Chip key={p} active={preset === p} onClick={() => savePreset(p)}>{p}</Chip>)}
+                {Object.keys(presets).map((p) => <Chip key={p} active={preset === p} onClick={() => savePreset(p)}>{p}</Chip>)}
                 {custom && <Chip active={preset === "Custom"} onClick={() => savePreset("Custom")}>Custom</Chip>}
               </div>
               <div className="mb-1 px-1 text-2xs font-semibold uppercase text-muted">Columns</div>
               <div className="max-h-64 overflow-auto">
-                {ALL_COLUMNS.filter((c) => c.title).map((c) => (
+                {allColumns.filter((c) => c.title).map((c) => (
                   <label key={c.id} className="flex items-center gap-2 rounded px-1 py-0.5 text-[13px] hover:bg-sunken">
                     <input type="checkbox" checked={columnIds.includes(c.id)} onChange={() => toggleColumn(c.id)} /> {c.title}
                   </label>

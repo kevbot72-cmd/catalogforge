@@ -177,7 +177,29 @@ export interface StoreProfile {
   connection: ConnectionKind;
   created_at: number;
   last_synced_at: number | null;
+  /** Product meta from other plugins managed in this store; shown as `meta:<key>` fields. */
+  custom_fields?: CustomField[];
 }
+
+export type CustomFieldKind = "text" | "longtext" | "number" | "yesno" | "date";
+
+export interface CustomField {
+  key: string;
+  label: string;
+  kind: CustomFieldKind;
+}
+
+/** A meta key found on the store's products. */
+export interface MetaKeyInfo {
+  key: string;
+  count: number;
+  sample: string;
+  label: string;
+  kind: CustomFieldKind;
+  source: string;
+}
+
+export const META_PREFIX = "meta:";
 
 export interface LocalSite {
   id: string;
@@ -404,4 +426,8 @@ export interface Backend {
   getMediaSettings(): Promise<MediaSettings>;
   setMediaSettings(s: MediaSettings): Promise<void>;
   onProgress(cb: (storeId: string, p: Progress) => void): () => void;
+  /** Plugin fields found on the store's products. */
+  metaKeys(id: string): Promise<MetaKeyInfo[]>;
+  /** Saves which plugin fields this store manages (then pull with full=true to load them). */
+  setCustomFields(id: string, fields: CustomField[]): Promise<StoreProfile>;
 }

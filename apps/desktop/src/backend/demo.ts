@@ -4,8 +4,7 @@
 
 import type {
   Backend, Category, CategoryRow, CloneOptions, Edit, Entity, HistoryEntry, HistoryItem, LocalFile, Media, MediaSettings, NewStoreInput,
-  Product, ProductQuery, ProductRow, Progress, PushReport, StagedChange, StagedSummary, StoreInfo, StoreProfile, TaxonomyData,
-} from "./types";
+  Product, ProductQuery, ProductRow, Progress, PushReport, StagedChange, StagedSummary, StoreInfo, StoreProfile, TaxonomyData, MetaKeyInfo } from "./types";
 
 const NEW = "new:";
 const DEL = "__delete";
@@ -149,6 +148,13 @@ function generate(profile: StoreProfile, seed: number, count: number): StoreData
       date_modified_gmt: now,
       featured: r() < 0.05,
     };
+    // Fields a brands/specs plugin would add (custom fields, see Settings → Custom fields).
+    Object.assign(p, {
+      "meta:brand": pick(["Northwind", "Summit Co.", "Trailhead", "Kestrel"]),
+      "meta:country_of_origin": pick(["Portugal", "Vietnam", "USA", "Italy"]),
+      "meta:warranty_years": String(pick([1, 2, 3, 5])),
+      "meta:eco_certified": r() < 0.4 ? "yes" : "no",
+    });
     if (!variable) p.stock_status = (p.stock_quantity ?? 0) > 0 ? "instock" : "outofstock";
     if (variable) {
       const sizes = SIZES.slice(0, 2 + Math.floor(r() * 3));
@@ -750,6 +756,18 @@ export function createDemoBackend(): Backend {
     async resolveImagePaths(paths) {
       // A browser cannot read arbitrary locations on disk; the desktop app does.
       return paths.map(() => null);
+    },
+    async metaKeys(id) {
+      const s = S(id);
+      const all = [...s.products.values()] as unknown as Record<string, unknown>[];
+      const count = (k: string) => all.filter((p) => p[k] !== undefined).length;
+      const info = (key: string, label: string, kind: MetaKeyInfo["kind"], source = "") => ({ key, label, kind, source, count: count(`meta:${key}`), sample: String(all.find((p) => p[`meta:${key}`])?.[`meta:${key}`] ?? "") });
+      return [info("brand", "Brand", "text", "ACF"), info("country_of_origin", "Country of origin", "text", "ACF"), info("warranty_years", "", "number"), info("eco_certified", "", "yesno")];
+    },
+    async setCustomFields(id, fields) {
+      const s = S(id);
+      s.profile = { ...s.profile, custom_fields: fields };
+      return s.profile;
     },
     async getMediaSettings() {
       return settings;

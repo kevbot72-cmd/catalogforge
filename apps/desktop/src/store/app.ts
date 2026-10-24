@@ -252,3 +252,12 @@ export const PRODUCT_FIELD_LABELS: Record<string, string> = {
   global_unique_id: "GTIN/EAN", menu_order: "Menu order", slug: "Slug", parent_id: "Parent", date_on_sale_from: "Sale from", date_on_sale_to: "Sale to",
   __new: "Created", __delete: "Deleted", parent: "Parent", display_type: "Display", banner_id: "Banner", alt: "Alt text",
 };
+
+/** Human label for a field, including custom fields (`meta:<key>`). */
+export function fieldLabel(field: string): string {
+  if (field.startsWith("meta:")) {
+    const key = field.slice(5);
+    return useApp.getState().info?.profile.custom_fields?.find((f) => f.key === key)?.label || key;
+  }
+  return PRODUCT_FIELD_LABELS[field] ?? field;
+}

@@ -18,6 +18,7 @@ class CF_Api {
 			array( '/index', 'GET', array( __CLASS__, 'index' ) ),
 			array( '/catalog', 'GET', array( __CLASS__, 'catalog' ) ),
 			array( '/taxonomy', 'GET', array( __CLASS__, 'taxonomy' ) ),
+			array( '/meta-keys', 'GET', array( __CLASS__, 'meta_keys' ) ),
 			array( '/batch', 'POST', array( __CLASS__, 'batch' ) ),
 			array( '/media', 'GET', array( 'CF_Media', 'listing' ) ),
 			array( '/media', 'POST', array( 'CF_Media', 'upload' ) ),
@@ -184,6 +185,31 @@ class CF_Api {
 			'next_after'  => count( $ids ) === $limit ? end( $ids ) : null,
 			'server_time' => time(),
 		);
+	}
+
+	/**
+	 * Meta keys used on products (for the custom field picker): [key, product count, sample values],
+	 * plus ACF field labels keyed by field name (field_…). Filtering happens in the app.
+	 */
+	public static function meta_keys() {
+		global $wpdb;
+		$rows = $wpdb->get_results(
+			"SELECT pm.meta_key, COUNT(DISTINCT pm.post_id) AS n,
+			        SUBSTRING(GROUP_CONCAT(DISTINCT LEFT(pm.meta_value, 160) SEPARATOR '\x1f'), 1, 1000) AS samples
+			 FROM {$wpdb->postmeta} pm JOIN {$wpdb->posts} p ON p.ID = pm.post_id
+			 WHERE p.post_type IN ('product','product_variation') AND p.post_status <> 'trash'
+			 GROUP BY pm.meta_key ORDER BY n DESC LIMIT 600",
+			ARRAY_N
+		);
+		$keys = array();
+		foreach ( (array) $rows as $r ) {
+			$keys[] = array( (string) $r[0], (int) $r[1], array_slice( explode( "\x1f", (string) $r[2] ), 0, 6 ) );
+		}
+		$labels = array();
+		foreach ( (array) $wpdb->get_results( "SELECT post_name, post_title FROM {$wpdb->posts} WHERE post_type = 'acf-field'", ARRAY_N ) as $r ) {
+			$labels[ $r[0] ] = $r[1];
+		}
+		return new WP_REST_Response( array( 'keys' => $keys, 'acf_labels' => (object) $labels ), 200 );
 	}
 
 	public static function taxonomy() {

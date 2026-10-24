@@ -64,6 +64,9 @@ pub struct StoreProfile {
     pub created_at: i64,
     #[serde(default)]
     pub last_synced_at: Option<i64>,
+    /// Product meta from other plugins that this store manages (see `custom_fields`).
+    #[serde(default)]
+    pub custom_fields: Vec<crate::custom_fields::CustomField>,
 }
 
 impl StoreProfile {
@@ -202,6 +205,7 @@ mod tests {
             connection: ConnectionKind::Local { site_id: "abc".into() },
             created_at: 1,
             last_synced_at: None,
+            custom_fields: Vec::new(),
         };
         store.upsert(p.clone()).unwrap();
         assert_eq!(store.get("s1").unwrap(), p);

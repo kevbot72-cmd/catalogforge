@@ -1,7 +1,7 @@
 import { AlertTriangle, ArrowRight, RotateCcw, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { StagedChange } from "../backend/types";
-import { PRODUCT_FIELD_LABELS, useApp } from "../store/app";
+import { fieldLabel, useApp } from "../store/app";
 import { Badge, Button, clsx, formatValue } from "./ui";
 
 export function ChangesPanel() {
@@ -57,7 +57,7 @@ export function ChangesPanel() {
               {!isNew && !isDel && fields.map((c) => (
                 <div key={c.field} className={clsx("group mt-1 rounded px-2 py-1 text-xs", c.conflict ? "bg-removed/10" : "bg-sunken/60")}>
                   <div className="flex items-center gap-1">
-                    <span className="w-24 shrink-0 text-muted">{PRODUCT_FIELD_LABELS[c.field] ?? c.field}</span>
+                    <span className="w-24 shrink-0 text-muted">{fieldLabel(c.field)}</span>
                     <span className="min-w-0 truncate text-removed line-through decoration-removed/50">{formatValue(c.base)}</span>
                     <ArrowRight size={11} className="shrink-0 text-muted" />
                     <span className="min-w-0 flex-1 truncate text-added">{formatValue(c.value)}</span>

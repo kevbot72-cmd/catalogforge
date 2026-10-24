@@ -3,7 +3,7 @@
 
 import Papa from "papaparse";
 import { compile, formatDecimal, isBlank, toStr, type Compiled } from "./formula";
-import type { Category, Edit, Entity, LocalFile, MediaRef, Product } from "../backend/types";
+import { META_PREFIX, type Category, type CustomField, type Edit, type Entity, type LocalFile, type MediaRef, type Product } from "../backend/types";
 
 export interface Sheet {
   name: string;
@@ -16,7 +16,7 @@ export type TargetKind = "field" | "attribute" | "attribute_pair" | "ignore";
 export interface FieldDef {
   key: string;
   label: string;
-  group: "Basics" | "Pricing" | "Inventory" | "Content" | "Organisation" | "Media" | "Shipping" | "SEO" | "Structure";
+  group: "Basics" | "Pricing" | "Inventory" | "Content" | "Organisation" | "Media" | "Shipping" | "SEO" | "Structure" | "Custom fields";
   kind: "text" | "decimal" | "int" | "bool" | "enum" | "html" | "list";
   options?: string[];
   synonyms: string[];
@@ -52,6 +52,18 @@ export const FIELDS: FieldDef[] = [
 ];
 
 export const FIELD_BY_KEY = Object.fromEntries(FIELDS.map((f) => [f.key, f]));
+
+/** Built-in fields plus the store's custom fields (mapped as `meta:<key>`). */
+export function fieldDefs(custom: CustomField[] = []): FieldDef[] {
+  return [
+    ...FIELDS,
+    ...custom.map((c): FieldDef => {
+      const label = c.label || c.key;
+      const words = (s: string) => s.toLowerCase().replace(/^_+/, "").replace(/[_-]+/g, " ").trim();
+      return { key: META_PREFIX + c.key, label, group: "Custom fields", kind: c.kind === "yesno" ? "bool" : c.kind === "longtext" ? "html" : "text", synonyms: [...new Set([words(label), words(c.key), c.key.toLowerCase()])] };
+    }),
+  ];
+}
 
 const ATTRIBUTE_HINTS = ["size", "colour", "color", "material", "style", "fit", "flavour", "flavor", "pack size", "capacity", "length", "finish", "pattern", "scent", "volume"];
 
@@ -132,12 +144,13 @@ function norm(s: string) {
   return s.toLowerCase().replace(/[_\-.]+/g, " ").replace(/\s+/g, " ").trim();
 }
 
-export function autoMap(sheet: Sheet): ImportConfig {
+export function autoMap(sheet: Sheet, custom: CustomField[] = []): ImportConfig {
+  const defs = fieldDefs(custom);
   const used = new Set<string>();
   const mappings: ColumnMapping[] = sheet.columns.map((column) => {
     const n = norm(column);
     let best: { field: string; score: number } | null = null;
-    for (const f of FIELDS) {
+    for (const f of defs) {
       for (const syn of f.synonyms) {
         const score = n === syn ? 1 : n.replace(/\s/g, "") === syn.replace(/\s/g, "") ? 0.95 : n.startsWith(syn + " ") || n.endsWith(" " + syn) ? 0.7 : 0;
         if (score > (best?.score ?? 0)) best = { field: f.key, score };
@@ -223,6 +236,8 @@ export interface PlanContext {
   /** SKU → existing product (from the store cache). */
   existingBySku: Map<string, Product>;
   imageFiles: LocalFile[];
+  /** The store's custom fields, mappable as `meta:<key>`. */
+  customFields?: CustomField[];
   /** Full file locations from the image column, resolved on disk (see imagePaths); null when missing. */
   pathFiles?: Map<string, LocalFile | null>;
   newKey: () => string;
@@ -406,9 +421,10 @@ export function buildPlan(sheet: Sheet, cfg: ImportConfig, ctx: PlanContext): Pl
   const taxonomyOf = (name: string) => "pa_" + name.toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 28);
   let imageCount = 0;
 
+  const defs = fieldDefs(ctx.customFields);
   const baseFields = (row: Record<string, string>, rowNo: number, forVariation: boolean, it: PlannedProduct) => {
     const f: Record<string, unknown> = {};
-    for (const def of FIELDS) {
+    for (const def of defs) {
       if (["parent_sku", "categories", "tags", "images", "type"].includes(def.key)) continue;
       if (!fieldCols.has(def.key) && !compiled[def.key] && !cfg.transforms[def.key]?.fallback) continue;
       if (forVariation && ["short_description", "featured", "slug", "menu_order", "seo_title", "seo_description"].includes(def.key)) continue;
@@ -433,7 +449,8 @@ export function buildPlan(sheet: Sheet, cfg: ImportConfig, ctx: PlanContext): Pl
           break;
         }
         case "bool":
-          if (v !== "") f[def.key] = parseBool(v);
+          // Custom yes/no fields are stored the way WordPress plugins expect: "yes" / "no".
+          if (v !== "") f[def.key] = def.key.startsWith(META_PREFIX) ? (parseBool(v) ? "yes" : "no") : parseBool(v);
           break;
         case "enum": {
           if (v === "") break;

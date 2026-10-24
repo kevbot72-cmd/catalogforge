@@ -384,7 +384,11 @@ impl Cache {
             Entity::Tag => "SELECT data FROM tags WHERE id = ?1",
         };
         let d: Option<String> = self.conn.query_row(sql, [id], |r| r.get(0)).optional()?;
-        Ok(d.map(|d| pj(&d)))
+        Ok(d.map(|d| {
+            let mut v = pj(&d);
+            crate::custom_fields::flatten_meta(&mut v);
+            v
+        }))
     }
 
     /* ------------------------------------------------------------------- staging */
@@ -623,6 +627,7 @@ impl Cache {
     /// Server record with staged overlay applied.
     fn overlay(base: Option<Value>, key: &str, fields: Option<&BTreeMap<String, (Value, Option<Value>, Option<Value>)>>) -> (Value, RowState) {
         let mut v = base.unwrap_or_else(|| json!({}));
+        crate::custom_fields::flatten_meta(&mut v);
         let mut state = RowState { key: key.to_string(), is_new: key.starts_with(NEW_PREFIX), ..Default::default() };
         if let Some(fields) = fields {
             for (f, (val, _, conflict)) in fields {

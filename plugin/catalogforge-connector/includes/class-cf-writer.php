@@ -393,7 +393,14 @@ class CF_Writer {
 		}
 
 		if ( $id && 'check' === $this->options['conflicts'] && ! empty( $op['base'] ) ) {
-			$conflicts = $this->conflicts( CF_Serializer::product( $existing ), $op['base'], $data );
+			// Custom fields arrive as data.meta and are compared as "meta:<key>" fields.
+			$meta_keys = array();
+			foreach ( array_keys( $op['base'] ) as $f ) {
+				if ( 0 === strpos( $f, 'meta:' ) ) {
+					$meta_keys[] = substr( $f, 5 );
+				}
+			}
+			$conflicts = $this->conflicts( self::flat_meta( CF_Serializer::product( $existing, $meta_keys ) ), $op['base'], self::flat_meta( $data ) );
 			if ( $conflicts ) {
 				return array( 'ok' => false, 'action' => 'conflict', 'id' => $id, 'conflicts' => $conflicts );
 			}
@@ -453,6 +460,16 @@ class CF_Writer {
 			);
 		}
 		return $out;
+	}
+
+	private static function flat_meta( array $row ) {
+		if ( isset( $row['meta'] ) && ( is_array( $row['meta'] ) || is_object( $row['meta'] ) ) ) {
+			foreach ( (array) $row['meta'] as $k => $v ) {
+				$row[ 'meta:' . $k ] = $v;
+			}
+			unset( $row['meta'] );
+		}
+		return $row;
 	}
 
 	private static function norm( $v ) {

@@ -414,7 +414,8 @@ fn build_ops(cache: &Cache, url_media: bool) -> Result<Vec<PreparedOp>> {
                 }
                 continue;
             }
-            data.insert(f.clone(), to_wire(v));
+            let wire = if f.starts_with(crate::custom_fields::META_PREFIX) { crate::custom_fields::wire_value(v) } else { to_wire(v) };
+            data.insert(f.clone(), wire);
             if !is_new {
                 if let Some(b) = b {
                     base.insert(f.clone(), b.clone());
@@ -424,6 +425,7 @@ fn build_ops(cache: &Cache, url_media: bool) -> Result<Vec<PreparedOp>> {
         if !image_urls.is_empty() {
             data.insert("image_urls".into(), Value::Array(image_urls));
         }
+        crate::custom_fields::fold_meta(&mut data);
         if data.is_empty() && !is_new {
             continue;
         }
@@ -617,7 +619,10 @@ fn apply_results(cache: &Mutex<Cache>, history_id: i64, chunk: &[PreparedOp], re
                                 label: p.label.clone(),
                                 field: f.clone(),
                                 before: p.base.get(f).cloned().unwrap_or(Value::Null),
-                                after: p.op.data.get(f).cloned().unwrap_or(Value::Null),
+                                after: match f.strip_prefix(crate::custom_fields::META_PREFIX) {
+                                    Some(k) => p.op.data.get("meta").and_then(|m| m.get(k)).cloned().unwrap_or(Value::Null),
+                                    None => p.op.data.get(f).cloned().unwrap_or(Value::Null),
+                                },
                                 action: if created { "created_field".into() } else { "updated".into() },
                             },
                         )?;
@@ -625,7 +630,18 @@ fn apply_results(cache: &Mutex<Cache>, history_id: i64, chunk: &[PreparedOp], re
                     if let Some(record) = &r.record {
                         match p.op.entity {
                             Entity::Product | Entity::Variation => {
-                                if let Ok(prod) = serde_json::from_value::<Product>(record.clone()) {
+                                if let Ok(mut prod) = serde_json::from_value::<Product>(record.clone()) {
+                                    // The returned record only has built-in fields: keep the custom
+                                    // fields we had, updated with what this push wrote.
+                                    let mut meta = c.product(prod.id)?.map(|old| old.meta).unwrap_or_default();
+                                    if let Some(Value::Object(written)) = p.op.data.get("meta") {
+                                        meta.extend(written.iter().filter(|(_, v)| !v.is_null()).map(|(k, v)| (k.clone(), v.clone())));
+                                        for (k, _) in written.iter().filter(|(_, v)| v.is_null()) {
+                                            meta.remove(k);
+                                        }
+                                    }
+                                    meta.extend(std::mem::take(&mut prod.meta));
+                                    prod.meta = meta;
                                     c.upsert_products(&[prod])?;
                                 }
                             }

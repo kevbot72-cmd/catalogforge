@@ -130,4 +130,13 @@ describe("plan", () => {
     const sheet = parseCsv("Name,SKU,Image\nMug,M-1,mug.jpg");
     expect(autoMap(sheet).imageMatch.byPath).toBe(false);
   });
+
+  it("maps and imports custom fields", () => {
+    const custom = [{ key: "brand", label: "Brand", kind: "text" as const }, { key: "eco_certified", label: "Eco certified", kind: "yesno" as const }];
+    const sheet = parseCsv("Name,SKU,Brand,Eco Certified\nKettle,K-1,Acme,Y");
+    const cfg = autoMap(sheet, custom);
+    expect(cfg.mappings.map((m) => m.field)).toEqual(["name", "sku", "meta:brand", "meta:eco_certified"]);
+    const plan = buildPlan(sheet, cfg, ctx({ customFields: custom }));
+    expect(plan.products[0].fields).toMatchObject({ "meta:brand": "Acme", "meta:eco_certified": "yes" });
+  });
 });

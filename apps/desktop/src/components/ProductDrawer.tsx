@@ -1,13 +1,13 @@
 import { Copy, Eye, EyeOff, Layers, RefreshCw, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Edit, Entity, MediaValue, ProductAttribute, ProductRow } from "../backend/types";
+import { META_PREFIX, type CustomField, type Edit, type Entity, type MediaValue, type ProductAttribute, type ProductRow } from "../backend/types";
 import { useApp } from "../store/app";
 import { BufferedInput, CategoryPicker, GalleryEditor, LibraryPicker, TagInput } from "./fields";
 import { RichTextEditor } from "./RichTextEditor";
 import { Badge, Button, clsx, Field, mediaUrl, Modal, Select, Tabs, Thumb, Toggle } from "./ui";
 import { VariationsPanel } from "./VariationsPanel";
 
-type Tab = "general" | "description" | "media" | "variations" | "organisation" | "inventory" | "seo";
+type Tab = "general" | "description" | "media" | "variations" | "organisation" | "inventory" | "seo" | "custom";
 
 export function useProductRow(key: string | null) {
   const { backend, storeId, version } = useApp();
@@ -105,6 +105,7 @@ export function ProductDrawer() {
             { id: "organisation", label: "Organisation" },
             { id: "inventory", label: "Inventory & shipping" },
             { id: "seo", label: "SEO" },
+            ...(info?.profile.custom_fields?.length ? [{ id: "custom" as Tab, label: "Custom fields" }] : []),
           ]}
         />
         {!row ? (
@@ -243,6 +244,7 @@ export function ProductDrawer() {
                 </Field>
               </div>
             )}
+            {tab === "custom" && <CustomFieldsPanel row={row} fields={info?.profile.custom_fields ?? []} set={set} dirty={dirty} />}
             {tab === "seo" && <SeoPanel row={row} set={set} dirty={dirty} home={info?.handshake?.home_url ?? ""} />}
           </div>
         )}
@@ -299,6 +301,34 @@ function AttributesEditor({ attrs, onChange, changed }: { attrs: ProductAttribut
         </Select>
       </div>
     </Field>
+  );
+}
+
+/** ACF saves dates as Ymd (20250131); keep whichever format the store already uses. */
+function dateIn(v: string) {
+  return /^\d{8}$/.test(v) ? `${v.slice(0, 4)}-${v.slice(4, 6)}-${v.slice(6, 8)}` : v.slice(0, 10);
+}
+
+function CustomFieldsPanel({ row, fields, set, dirty }: { row: ProductRow; fields: CustomField[]; set: (f: string, v: unknown) => void; dirty: Set<string> }) {
+  return (
+    <div className="grid grid-cols-2 gap-4" data-testid="custom-fields-panel">
+      {fields.map((f) => {
+        const id = META_PREFIX + f.key;
+        const value = String((row as Record<string, unknown>)[id] ?? "");
+        const label = f.label || f.key;
+        return (
+          <Field key={f.key} label={label} className={f.kind === "longtext" ? "col-span-2" : undefined} changed={dirty.has(id)} hint={f.label ? <code className="text-2xs">{f.key}</code> : undefined}>
+            {f.kind === "yesno" ? (
+              <Toggle checked={["yes", "1", "true", "on"].includes(value.toLowerCase())} onChange={(v) => set(id, v ? "yes" : "no")} label={label} />
+            ) : f.kind === "date" ? (
+              <input type="date" className="h-8 w-full rounded-md border border-line bg-panel px-2 text-[13px]" value={dateIn(value)} onChange={(e) => set(id, /^\d{8}$/.test(value) ? e.target.value.replace(/-/g, "") : e.target.value)} />
+            ) : (
+              <BufferedInput value={value} multiline={f.kind === "longtext"} inputMode={f.kind === "number" ? "decimal" : undefined} onCommit={(v) => set(id, v)} data-testid={`cf-${f.key}`} />
+            )}
+          </Field>
+        );
+      })}
+    </div>
   );
 }
 

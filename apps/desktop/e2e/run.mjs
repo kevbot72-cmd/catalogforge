@@ -256,6 +256,49 @@ await step("export: dialog offers Excel/CSV and downloads a valid workbook", asy
   await shot("15-export");
 });
 
+await step("custom fields: discover, pick, then edit in grid view and product tab", async () => {
+  await page.getByTestId("nav-settings").click();
+  await page.getByTestId("cf-scan").click();
+  await page.getByTestId("cf-pick-brand").check();
+  await page.getByTestId("cf-pick-warranty_years").check();
+  await shot("16-custom-fields-settings");
+  await page.getByTestId("cf-save").click();
+  await page.getByText("Custom fields saved").waitFor();
+  await page.getByTestId("nav-products").click();
+  if ((await page.getByTestId("filter-changed").getAttribute("class")).includes("text-accent")) await page.getByTestId("filter-changed").click();
+  await page.getByRole("button", { name: /^(Default|Custom|Pricing|Inventory|Shipping|SEO)$/ }).click();
+  await page.getByRole("button", { name: "Custom fields", exact: true }).click();
+  await page.mouse.move(10, 10);
+  await page.waitForTimeout(400);
+  await shot("17-custom-fields-grid");
+  await page.getByTestId("open-palette").click();
+  await page.getByTestId("palette").locator("input").fill("Trail");
+  await page.waitForTimeout(400);
+  await page.getByTestId("palette").locator('[cmdk-item][data-value^="product"]').first().click();
+  await page.getByRole("tab", { name: "Custom fields" }).click();
+  const brand = page.getByTestId("cf-brand");
+  await brand.fill("Acme Outdoor");
+  await brand.press("Enter");
+  await page.waitForTimeout(300);
+  expect((await page.getByTestId("custom-fields-panel").innerText()).includes("Brand"), "panel shows the label");
+  await shot("18-custom-fields-drawer");
+  await page.getByLabel("Close drawer").click();
+});
+
+await step("a new product's Media, Organisation and SEO tabs render", async () => {
+  await page.getByTestId("open-palette").click();
+  await page.getByTestId("palette").locator("input").fill("New product");
+  await page.waitForTimeout(300);
+  await page.getByTestId("palette").getByText("New product", { exact: true }).click();
+  await page.getByTestId("product-drawer").waitFor();
+  for (const t of ["Media", "Organisation", "SEO", "Custom fields"]) {
+    await page.getByRole("tab", { name: t }).click();
+    await page.waitForTimeout(150);
+    expect(!(await page.getByTestId("error-boundary").count()), `${t} tab crashed`);
+  }
+  await page.getByLabel("Close drawer").click();
+});
+
 await step("dark mode", async () => {
   await page.getByTestId("nav-products").click();
   await page.getByLabel("Toggle dark mode").click();

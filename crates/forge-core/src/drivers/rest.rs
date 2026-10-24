@@ -22,6 +22,7 @@ pub struct RestDriver {
     cs: String,
     /// taxonomy (pa_x) → global attribute id, and term name → slug per taxonomy.
     attrs: RwLock<Option<(HashMap<String, i64>, HashMap<i64, String>, HashMap<String, HashMap<String, String>>)>>,
+    custom: super::MetaKeys,
 }
 
 fn s(v: &Value) -> String {
@@ -40,6 +41,7 @@ impl RestDriver {
             ck: consumer_key.into(),
             cs: consumer_secret.into(),
             attrs: RwLock::new(None),
+            custom: Default::default(),
         })
     }
 
@@ -217,7 +219,10 @@ impl RestDriver {
             focus_keyword: [meta("_yoast_wpseo_focuskw"), meta("rank_math_focus_keyword")].into_iter().find(|x| !x.is_empty()).unwrap_or_default(),
             date_created_gmt: v["date_created_gmt"].as_str().map(|d| format!("{d}Z")),
             date_modified_gmt: v["date_modified_gmt"].as_str().map(|d| format!("{d}Z")),
-            meta: BTreeMap::new(),
+            meta: {
+                let md = v["meta_data"].as_array();
+                self.custom.get().into_iter().filter_map(|k| md.and_then(|a| a.iter().find(|m| m["key"] == k.as_str())).map(|m| (k, crate::custom_fields::wire_value(&m["value"])))).collect()
+            },
         }
     }
 
@@ -253,6 +258,13 @@ impl RestDriver {
                 }
                 "tags" => {
                     out.insert("tags".into(), Value::Array(v.as_array().into_iter().flatten().map(|n| json!({ "name": n })).collect()));
+                }
+                "meta" => {
+                    let md = out.entry("meta_data").or_insert_with(|| json!([]));
+                    for (key, value) in v.as_object().into_iter().flatten() {
+                        let value = if value.is_null() { json!("") } else { value.clone() };
+                        md.as_array_mut().unwrap().push(json!({ "key": key, "value": value }));
+                    }
                 }
                 "seo_title" | "seo_description" | "focus_keyword" => {
                     let key = match k.as_str() {
@@ -667,5 +679,27 @@ impl Driver for RestDriver {
 
     async fn preview(&self, _product_id: Option<i64>, _draft: &Value) -> Result<String> {
         Err(unsupported("Live theme preview", "REST API"))
+    }
+
+    fn set_meta_keys(&self, keys: Vec<String>) {
+        self.custom.set(keys);
+    }
+
+    /// Samples the newest products. wc/v3 hides "protected" keys (starting with `_`), so only
+    /// public plugin fields are visible over REST.
+    async fn meta_keys(&self) -> Result<Vec<crate::custom_fields::MetaKeyInfo>> {
+        let (v, _) = self.req(reqwest::Method::GET, "/products", &[("per_page", "100".into()), ("status", "any".into())], None).await?;
+        let mut seen: BTreeMap<String, (i64, Vec<String>)> = BTreeMap::new();
+        for p in v.as_array().into_iter().flatten() {
+            for m in p["meta_data"].as_array().into_iter().flatten() {
+                let e = seen.entry(s(&m["key"])).or_default();
+                e.0 += 1;
+                let val = if m["value"].is_object() || m["value"].is_array() { "a:0:{}".to_string() } else { s(&m["value"]) };
+                if e.1.len() < 6 && !e.1.contains(&val) {
+                    e.1.push(val);
+                }
+            }
+        }
+        Ok(crate::custom_fields::summarize(seen.into_iter().map(|(k, (c, s))| (k, c, s)).collect(), &HashMap::new()))
     }
 }

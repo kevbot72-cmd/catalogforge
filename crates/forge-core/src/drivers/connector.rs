@@ -25,9 +25,15 @@ pub struct ConnectorDriver {
     /// Sent as the Host header when talking to a Local site's web server directly.
     host_override: Option<String>,
     batch_size: usize,
+    custom: super::MetaKeys,
 }
 
 impl ConnectorDriver {
+    fn meta_param(&self) -> Option<(String, String)> {
+        let keys = self.custom.get();
+        (!keys.is_empty()).then(|| ("meta_keys".to_string(), keys.join(",")))
+    }
+
     pub fn new(rest_root: &str, key: &str, secret: &str) -> Result<Self> {
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(300))
@@ -42,6 +48,7 @@ impl ConnectorDriver {
             secret: secret.into(),
             host_override: None,
             batch_size: 250,
+            custom: Default::default(),
         })
     }
 
@@ -227,14 +234,18 @@ impl Driver for ConnectorDriver {
     }
 
     async fn catalog_page(&self, after_id: i64, limit: usize) -> Result<CatalogPage> {
-        self.get("/catalog", &[("after_id".into(), after_id.to_string()), ("limit".into(), limit.to_string())]).await
+        let mut params = vec![("after_id".into(), after_id.to_string()), ("limit".into(), limit.to_string())];
+        params.extend(self.meta_param());
+        self.get("/catalog", &params).await
     }
 
     async fn catalog_by_ids(&self, ids: &[i64]) -> Result<CatalogPage> {
         let mut out = CatalogPage::default();
         for chunk in ids.chunks(500) {
             let csv = chunk.iter().map(|i| i.to_string()).collect::<Vec<_>>().join(",");
-            let page: CatalogPage = self.get("/catalog", &[("ids".into(), csv), ("limit".into(), "1000".into())]).await?;
+            let mut params = vec![("ids".into(), csv), ("limit".into(), "1000".into())];
+            params.extend(self.meta_param());
+            let page: CatalogPage = self.get("/catalog", &params).await?;
             out.products.extend(page.products);
             out.media.extend(page.media);
             out.server_time = page.server_time;
@@ -298,6 +309,21 @@ impl Driver for ConnectorDriver {
             return Err(anyhow!("Store did not return a preview URL"));
         }
         Ok(r.url)
+    }
+
+    fn set_meta_keys(&self, keys: Vec<String>) {
+        self.custom.set(keys);
+    }
+
+    async fn meta_keys(&self) -> Result<Vec<crate::custom_fields::MetaKeyInfo>> {
+        #[derive(serde::Deserialize)]
+        struct R {
+            keys: Vec<(String, i64, Vec<String>)>,
+            #[serde(default)]
+            acf_labels: std::collections::HashMap<String, String>,
+        }
+        let r: R = self.get("/meta-keys", &[]).await.map_err(|e| anyhow!("{e}. Update the CatalogForge Connector plugin to 0.2 or later to use custom fields."))?;
+        Ok(crate::custom_fields::summarize(r.keys, &r.acf_labels))
     }
 }
 

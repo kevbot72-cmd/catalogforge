@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import type { LocalFile, Product } from "../backend/types";
 import { isTauri, readLocalFile } from "../backend/tauri";
 import { Badge, Button, clsx, Dropzone, Field, Input, Modal, Select, Toggle } from "../components/ui";
-import { autoMap, buildPlan, FIELDS, imagePaths, parseCsv, parseFile, planToStaging, type ColumnMapping, type ImportConfig, type Plan, type Sheet } from "../lib/importer";
+import { autoMap, buildPlan, fieldDefs, imagePaths, parseCsv, parseFile, planToStaging, type ColumnMapping, type ImportConfig, type Plan, type Sheet } from "../lib/importer";
 import { useApp } from "../store/app";
 
 type Step = "source" | "map" | "review";
@@ -18,7 +18,9 @@ function loadProfiles(): Record<string, ImportConfig & { signature: string }> {
 }
 
 export function ImportWizard() {
-  const { dialog, openDialog, backend, storeId, taxonomy, create, stage, setQuery, toast } = useApp();
+  const { dialog, openDialog, backend, storeId, taxonomy, create, stage, setQuery, toast, info } = useApp();
+  const customFields = info?.profile.custom_fields;
+  const FIELDS = fieldDefs(customFields);
   const open = dialog === "import";
   const [step, setStep] = useState<Step>("source");
   const [sheets, setSheets] = useState<Sheet[]>([]);
@@ -58,7 +60,7 @@ export function ImportWizard() {
       setProfileApplied(saved[0]);
       setProfileName(saved[0]);
     } else {
-      setCfg(autoMap(sheet));
+      setCfg(autoMap(sheet, customFields));
       setProfileApplied(null);
     }
   }, [sheet]);
@@ -115,7 +117,7 @@ export function ImportWizard() {
         paths.forEach((p, i) => pathFiles.set(p, found[i]));
       }
       let n = 0;
-      const p = buildPlan(sheet, cfg, { categories: (taxonomy?.categories ?? []).filter((c) => !c._state.is_new), existingBySku: bySku, imageFiles: images, pathFiles, newKey: () => `new:imp${Date.now().toString(36)}${(n++).toString(36)}` });
+      const p = buildPlan(sheet, cfg, { categories: (taxonomy?.categories ?? []).filter((c) => !c._state.is_new), existingBySku: bySku, imageFiles: images, pathFiles, customFields, newKey: () => `new:imp${Date.now().toString(36)}${(n++).toString(36)}` });
       setPlan(p);
       setStep("review");
     } finally {
@@ -271,7 +273,7 @@ export function ImportWizard() {
                             <option value="attr:info">Attribute → information only</option>
                           </optgroup>
                           {[...new Set(FIELDS.map((f) => f.group))].map((g) => (
-                            <optgroup key={g} label={g}>{FIELDS.filter((f) => f.group === g).map((f) => <option key={f.key} value={`f:${f.key}`} disabled={cfg.mappings.some((x, j) => j !== i && x.field === f.key)}>{f.label}</option>)}</optgroup>
+                            <optgroup key={g} label={g}>{FIELDS.filter((f) => f.group === g).map((f) => <option key={f.key} value={`f:${f.key}`} disabled={f.key !== "images" && cfg.mappings.some((x, j) => j !== i && x.field === f.key)}>{f.label}</option>)}</optgroup>
                           ))}
                         </Select>
                       </td>
@@ -285,12 +287,12 @@ export function ImportWizard() {
             <summary className="cursor-pointer text-[13px] font-medium">Transform values with formulas</summary>
             <p className="mt-1 text-xs text-muted">Reference columns as <code>{"{Column name}"}</code> and mapped fields by name. E.g. price from cost: <code>=CHARM({"{Cost}"} * 2.2)</code>, tidy names: <code>=PROPER(TRIM(name))</code>.</p>
             <div className="mt-2 space-y-2">
-              {FIELDS.filter((f) => ["name", "sku", "regular_price", "sale_price", "status", "stock_quantity", "categories", "tags", "description", "short_description", "seo_title", "seo_description", "images"].includes(f.key)).map((f) => {
+              {FIELDS.filter((f) => ["name", "sku", "regular_price", "sale_price", "status", "stock_quantity", "categories", "tags", "description", "short_description", "seo_title", "seo_description", "images"].includes(f.key) || f.key.startsWith("meta:")).map((f) => {
                 const t = cfg.transforms[f.key] ?? {};
                 const sample = (() => {
                   try {
                     if (!t.formula) return "";
-                    const p = buildPlan({ ...sheet, rows: sheet.rows.slice(0, 1) }, { ...cfg, transforms: { [f.key]: t } }, { categories: [], existingBySku: new Map(), imageFiles: [], newKey: () => "x" });
+                    const p = buildPlan({ ...sheet, rows: sheet.rows.slice(0, 1) }, { ...cfg, transforms: { [f.key]: t } }, { categories: [], existingBySku: new Map(), imageFiles: [], customFields, newKey: () => "x" });
                     const err = p.issues.find((x) => x.level === "error" && x.field === f.key);
                     if (err) return `⚠ ${err.message}`;
                     return `→ ${String(p.products[0]?.fields[f.key === "categories" ? "category_ids" : f.key] ?? "")}`;

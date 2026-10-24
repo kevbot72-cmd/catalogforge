@@ -3,7 +3,7 @@ import DataEditor, {
 } from "@glideapps/glide-data-grid";
 import "@glideapps/glide-data-grid/dist/index.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Edit, ProductRow } from "../backend/types";
+import { META_PREFIX, type CustomField, type Edit, type ProductRow } from "../backend/types";
 import { useApp } from "../store/app";
 import { mediaUrl } from "./ui";
 
@@ -54,6 +54,27 @@ export const VIEW_PRESETS: Record<string, string[]> = {
   Shipping: ["_expand", "image_id", "name", "sku", "weight", "length", "width", "height", "shipping_class"],
   SEO: ["_expand", "image_id", "name", "sku", "seo_title", "seo_description", "short_description", "catalog_visibility", "featured"],
 };
+
+/** Grid columns for the store's custom fields (plugin meta), editable like built-in fields. */
+export function customColumns(fields: CustomField[] = []): ColumnDef[] {
+  return fields.map((f) => ({
+    id: META_PREFIX + f.key,
+    title: f.label || f.key,
+    width: f.kind === "longtext" ? 260 : f.kind === "yesno" || f.kind === "number" ? 90 : 150,
+    kind: f.kind === "number" ? "price" : f.kind === "yesno" ? "enum" : f.kind === "longtext" ? "html" : "text",
+    options: f.kind === "yesno" ? ["yes", "no"] : undefined,
+    editable: f.kind !== "longtext",
+  }));
+}
+
+export function columnsFor(fields?: CustomField[]): ColumnDef[] {
+  return [...ALL_COLUMNS, ...customColumns(fields)];
+}
+
+export function presetsFor(fields?: CustomField[]): Record<string, string[]> {
+  if (!fields?.length) return VIEW_PRESETS;
+  return { ...VIEW_PRESETS, "Custom fields": ["_expand", "image_id", "name", "sku", ...fields.map((f) => META_PREFIX + f.key)] };
+}
 
 const PAGE = 200;
 
@@ -258,8 +279,8 @@ export function ProductGrid({ columns }: { columns: ColumnDef[] }) {
           }
           case "enum": {
             const v = raw.toLowerCase().replace(/\s+/g, "");
-            const alias: Record<string, string> = { published: "publish", live: "publish", active: "publish", "in": "instock", out: "outofstock", backorder: "onbackorder" };
-            const val = c.options?.includes(v) ? v : alias[v];
+            const alias: Record<string, string> = { published: "publish", live: "publish", active: "publish", "in": "instock", out: "outofstock", backorder: "onbackorder", true: "yes", y: "yes", "1": "yes", false: "no", n: "no", "0": "no" };
+            const val = c.options?.includes(v) ? v : c.options?.includes(alias[v]) ? alias[v] : undefined;
             if (!val) return `${c.title} must be one of: ${c.options?.join(", ")}`;
             value = val;
             break;

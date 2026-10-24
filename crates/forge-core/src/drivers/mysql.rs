@@ -7,6 +7,7 @@
 //! plugins stay consistent.
 
 use super::{unsupported, Capabilities, Driver, MediaText};
+use crate::custom_fields::{summarize, MetaKeyInfo};
 use crate::media::PreparedImage;
 use crate::model::*;
 use crate::phpser;
@@ -37,6 +38,7 @@ pub struct MysqlDriver {
     home: String,
     uploads_url: String,
     attr_labels: HashMap<String, String>,
+    custom: super::MetaKeys,
 }
 
 const META_KEYS: &[&str] = &[
@@ -48,6 +50,11 @@ const META_KEYS: &[&str] = &[
     "rank_math_title", "rank_math_description", "rank_math_focus_keyword",
     "_cf_seo_title", "_cf_seo_description", "_cf_focus_keyword",
 ];
+
+/// Quoted SQL string literal (keys come from the store itself, but never trust them in SQL).
+fn sql_str(s: &str) -> String {
+    format!("'{}'", s.replace('\\', "\\\\").replace('\'', "''"))
+}
 
 fn iso(mysql_dt: &str) -> Option<String> {
     if mysql_dt.is_empty() || mysql_dt.starts_with("0000") {
@@ -85,6 +92,7 @@ impl MysqlDriver {
             home: String::new(),
             uploads_url: String::new(),
             attr_labels: HashMap::new(),
+            custom: Default::default(),
         };
         d.home = d.option("home").await?.unwrap_or_default().trim_end_matches('/').to_string();
         let siteurl = d.option("siteurl").await?.unwrap_or_else(|| d.home.clone());
@@ -164,7 +172,8 @@ impl MysqlDriver {
         let list = Self::id_list(&ids);
 
         // postmeta
-        let keys = META_KEYS.iter().map(|k| format!("'{k}'")).collect::<Vec<_>>().join(",");
+        let custom = self.custom.get();
+        let keys = META_KEYS.iter().map(|k| k.to_string()).chain(custom.iter().cloned()).map(|k| sql_str(&k)).collect::<Vec<_>>().join(",");
         let meta_rows = sqlx::query(&format!(
             "SELECT post_id, meta_key, meta_value FROM {p}postmeta WHERE post_id IN ({list}) AND (meta_key IN ({keys}) OR meta_key LIKE 'attribute\\_%')"
         ))
@@ -298,7 +307,7 @@ impl MysqlDriver {
                 focus_keyword: if is_var { String::new() } else { first_nonempty(&["_yoast_wpseo_focuskw", "rank_math_focus_keyword", "_cf_focus_keyword"]) },
                 date_created_gmt: post_date.as_deref().and_then(iso),
                 date_modified_gmt: modified.as_deref().and_then(iso),
-                meta: BTreeMap::new(),
+                meta: custom.iter().filter_map(|k| m.get(k).map(|v| (k.clone(), Value::String(v.clone())))).collect(),
             });
         }
         products.sort_by_key(|p| p.id);
@@ -531,5 +540,38 @@ impl Driver for MysqlDriver {
 
     async fn preview(&self, product_id: Option<i64>, draft: &Value) -> Result<String> {
         self.writer()?.preview(product_id, draft).await
+    }
+
+    fn set_meta_keys(&self, keys: Vec<String>) {
+        self.custom.set(keys.clone());
+        if let Some(w) = &self.write_via {
+            w.set_meta_keys(keys);
+        }
+    }
+
+    async fn meta_keys(&self) -> Result<Vec<MetaKeyInfo>> {
+        let p = &self.p;
+        let rows = sqlx::query(&format!(
+            "SELECT pm.meta_key, COUNT(DISTINCT pm.post_id),
+                    CAST(SUBSTRING(GROUP_CONCAT(DISTINCT LEFT(pm.meta_value, 160) SEPARATOR '\x1f'), 1, 1000) AS CHAR)
+             FROM {p}postmeta pm JOIN {p}posts po ON po.ID = pm.post_id
+             WHERE po.post_type IN ('product','product_variation') AND po.post_status <> 'trash'
+             GROUP BY pm.meta_key ORDER BY 2 DESC LIMIT 600"
+        ))
+        .fetch_all(&self.pool)
+        .await?;
+        let raw = rows
+            .iter()
+            .map(|r| {
+                let samples: String = r.try_get::<Option<String>, _>(2).ok().flatten().unwrap_or_default();
+                (r.get::<String, _>(0), r.get::<i64, _>(1), samples.split('\x1f').take(6).map(str::to_string).collect())
+            })
+            .collect();
+        let labels: HashMap<String, String> = sqlx::query(&format!("SELECT post_name, post_title FROM {p}posts WHERE post_type = 'acf-field'"))
+            .fetch_all(&self.pool)
+            .await
+            .map(|rows| rows.iter().map(|r| (r.get::<String, _>(0), r.get::<String, _>(1))).collect())
+            .unwrap_or_default();
+        Ok(summarize(raw, &labels))
     }
 }

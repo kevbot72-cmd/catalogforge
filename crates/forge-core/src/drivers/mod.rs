@@ -1,6 +1,7 @@
 //! Store drivers. Every connection type implements [`Driver`]; the sync engine never needs to know
 //! which one it is talking to, only what it [`Capabilities`] says it can do.
 
+use crate::custom_fields::MetaKeyInfo;
 use crate::media::PreparedImage;
 use crate::model::*;
 use anyhow::Result;
@@ -55,6 +56,25 @@ pub trait Driver: Send + Sync {
     /// Asks the server to download and register a remote image.
     async fn sideload_media(&self, url: &str, text: &MediaText) -> Result<MediaUploadResult>;
     async fn preview(&self, product_id: Option<i64>, draft: &serde_json::Value) -> Result<String>;
+    /// Custom field (post meta) keys to read with every product from now on.
+    fn set_meta_keys(&self, _keys: Vec<String>) {}
+    /// Meta keys found on the store's products, for the custom field picker.
+    async fn meta_keys(&self) -> Result<Vec<MetaKeyInfo>> {
+        Err(anyhow::anyhow!("Custom fields are not available over this connection."))
+    }
+}
+
+/// Shared, swappable list of custom field keys a driver reads.
+#[derive(Clone, Default)]
+pub struct MetaKeys(std::sync::Arc<std::sync::RwLock<Vec<String>>>);
+
+impl MetaKeys {
+    pub fn set(&self, keys: Vec<String>) {
+        *self.0.write().unwrap_or_else(|e| e.into_inner()) = keys;
+    }
+    pub fn get(&self) -> Vec<String> {
+        self.0.read().unwrap_or_else(|e| e.into_inner()).clone()
+    }
 }
 
 pub(crate) fn unsupported(what: &str, kind: &str) -> anyhow::Error {

@@ -74,6 +74,7 @@ impl AppState {
         }
         let profile = self.profiles.get(id).map_err(err)?;
         let driver = self.build_driver(&profile).await.map_err(err)?;
+        driver.set_meta_keys(profile.custom_fields.iter().map(|f| f.key.clone()).collect());
         let cache = Cache::open(&self.cache_path(id)).map_err(err)?;
         let s = Arc::new(OpenStore { driver, cache: Arc::new(Mutex::new(cache)) });
         open.insert(id.to_string(), s.clone());
@@ -124,6 +125,7 @@ async fn add_store(state: State<'_, AppState>, input: NewStore) -> CmdResult<Sto
         connection: ConnectionKind::Local { site_id: String::new() },
         created_at: chrono::Utc::now().timestamp(),
         last_synced_at: None,
+        custom_fields: Vec::new(),
     };
     let secret_ref = profile.secret_ref();
     match input.connection {
@@ -221,6 +223,25 @@ async fn pull(app: AppHandle, state: State<'_, AppState>, id: String, full: bool
         let _ = state.profiles.upsert(p);
     }
     Ok(report)
+}
+
+/* ---------------------------------------------------------- custom fields */
+
+#[tauri::command]
+async fn meta_keys(state: State<'_, AppState>, id: String) -> CmdResult<Vec<forge_core::custom_fields::MetaKeyInfo>> {
+    let s = state.store(&id).await?;
+    s.driver.meta_keys().await.map_err(err)
+}
+
+/// Saves the store's custom fields. The caller re-pulls so products pick up the new fields.
+#[tauri::command]
+async fn set_custom_fields(state: State<'_, AppState>, id: String, fields: Vec<forge_core::custom_fields::CustomField>) -> CmdResult<StoreProfile> {
+    let s = state.store(&id).await?;
+    let mut p = state.profiles.get(&id).map_err(err)?;
+    s.driver.set_meta_keys(fields.iter().map(|f| f.key.clone()).collect());
+    p.custom_fields = fields;
+    state.profiles.upsert(p.clone()).map_err(err)?;
+    Ok(p)
 }
 
 /* ---------------------------------------------------------------- catalog */
@@ -541,7 +562,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             list_stores, add_store, remove_store, local_sites, start_local_site, open_store, pull, query, rows, skus, variations, taxonomy, media, stage, create,
-            remove, undo, discard, summary, changes, resolve_conflict, push, history, history_items, revert, preview, clone_products, scan_paths, resolve_image_paths,
+            remove, undo, discard, summary, changes, resolve_conflict, push, history, history_items, revert, preview, clone_products, scan_paths, resolve_image_paths, meta_keys, set_custom_fields,
             read_file, write_file, get_media_settings, set_media_settings
         ])
         .run(tauri::generate_context!())

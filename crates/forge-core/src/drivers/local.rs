@@ -179,6 +179,13 @@ impl Driver for LocalDriver {
     async fn preview(&self, product_id: Option<i64>, draft: &serde_json::Value) -> Result<String> {
         self.connector.preview(product_id, draft).await
     }
+    fn set_meta_keys(&self, keys: Vec<String>) {
+        self.reader.set_meta_keys(keys.clone());
+        self.connector.set_meta_keys(keys);
+    }
+    async fn meta_keys(&self) -> Result<Vec<crate::custom_fields::MetaKeyInfo>> {
+        self.reader.meta_keys().await
+    }
 }
 
 /// Location of the connector plugin bundled with the app.

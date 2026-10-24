@@ -2,7 +2,7 @@ import { ArrowRight, History, RotateCcw } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { HistoryEntry, HistoryItem } from "../backend/types";
 import { Badge, Button, Empty, formatValue, timeAgo } from "../components/ui";
-import { PRODUCT_FIELD_LABELS, useApp } from "../store/app";
+import { fieldLabel, useApp } from "../store/app";
 
 export function HistoryView() {
   const { backend, storeId, version, toast, toggleChanges } = useApp();
@@ -55,7 +55,7 @@ export function HistoryView() {
                 {items.filter((i) => i.action !== "created_field").map((i, n) => (
                   <tr key={n} className="border-t border-line">
                     <td className="max-w-[220px] truncate py-1.5 pr-2">{i.label} <span className="text-2xs text-muted">#{i.id}</span></td>
-                    <td className="pr-2 text-muted">{i.action === "created" ? "Created" : i.action === "deleted" ? "Deleted" : PRODUCT_FIELD_LABELS[i.field] ?? i.field}</td>
+                    <td className="pr-2 text-muted">{i.action === "created" ? "Created" : i.action === "deleted" ? "Deleted" : fieldLabel(i.field)}</td>
                     <td className="max-w-[200px] truncate pr-2 text-removed">{i.action === "updated" ? formatValue(i.before) : ""}</td>
                     <td className="pr-2 text-muted">{i.action === "updated" && <ArrowRight size={12} />}</td>
                     <td className="max-w-[200px] truncate text-added">{i.action === "updated" ? formatValue(i.after) : ""}</td>

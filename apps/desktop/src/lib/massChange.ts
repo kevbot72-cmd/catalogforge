@@ -1,5 +1,5 @@
 import { compile, formatDecimal, toStr } from "./formula";
-import type { ProductRow } from "../backend/types";
+import { META_PREFIX, type CustomField, type ProductRow } from "../backend/types";
 
 export type FieldKind = "decimal" | "int" | "text" | "html" | "enum" | "bool" | "cats" | "tags";
 
@@ -36,6 +36,20 @@ export const MASS_FIELDS: MassField[] = [
   { key: "backorders", label: "Backorders", kind: "enum", variations: true, options: [{ value: "no", label: "Do not allow" }, { value: "notify", label: "Allow, notify" }, { value: "yes", label: "Allow" }] },
   { key: "menu_order", label: "Menu order", kind: "int" },
 ];
+
+/** Built-in bulk-edit fields plus the store's custom fields. */
+export function massFieldsFor(custom: CustomField[] = []): MassField[] {
+  return [
+    ...MASS_FIELDS,
+    ...custom.map((c): MassField => ({
+      key: META_PREFIX + c.key,
+      label: c.label || c.key,
+      kind: c.kind === "number" ? "decimal" : c.kind === "yesno" ? "enum" : c.kind === "longtext" ? "html" : "text",
+      options: c.kind === "yesno" ? [{ value: "yes", label: "Yes" }, { value: "no", label: "No" }] : undefined,
+      variations: true,
+    })),
+  ];
+}
 
 export type OpId =
   | "set" | "clear" | "formula" | "inc_pct" | "dec_pct" | "add" | "sub" | "mul" | "round" | "charm" | "pct_off_regular"

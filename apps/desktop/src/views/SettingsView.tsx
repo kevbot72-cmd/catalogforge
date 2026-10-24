@@ -3,6 +3,7 @@ import pkg from "../../package.json";
 import type { MediaSettings } from "../backend/types";
 import { Badge, Button, Field, Input, Select, Toggle } from "../components/ui";
 import { useApp } from "../store/app";
+import { CustomFieldsSettings } from "./CustomFieldsSettings";
 
 export function SettingsView() {
   const { backend, info, stores, storeId, refreshStores, selectStore, toast } = useApp();
@@ -43,6 +44,7 @@ export function SettingsView() {
             </div>
           )}
         </section>
+        {info && <CustomFieldsSettings />}
         {info && (
           <section>
             <h2 className="mb-3 text-sm font-semibold">This store</h2>
