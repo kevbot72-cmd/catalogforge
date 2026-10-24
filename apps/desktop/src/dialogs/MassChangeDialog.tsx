@@ -2,6 +2,7 @@ import { ArrowRight } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { Edit, ProductRow } from "../backend/types";
 import { CategoryPicker, TagInput } from "../components/fields";
+import { RichTextEditor } from "../components/RichTextEditor";
 import { Badge, Button, Field, formatValue, Input, Modal, Select, Toggle } from "../components/ui";
 import { FUNCTION_HELP } from "../lib/formula";
 import { applyMass, isApplicable, massFieldsFor, OPS_BY_KIND, type MassOp, type OpId } from "../lib/massChange";
@@ -94,6 +95,8 @@ export function MassChangeDialog() {
     toast({ tone: "success", title: `${changes.length} products updated locally`, body: "One step — press Undo to reverse it. Push when ready." });
   };
 
+  // Descriptions are HTML: setting, prepending or appending uses the rich-text editor.
+  const richValue = field.kind === "html" && ["set", "prepend", "append"].includes(op);
   const needsValue = !["clear", "case", "trim", "charm", "add_items", "remove_items", "set_items"].includes(op) && field.kind !== "bool" && field.kind !== "enum";
   return (
     <Modal open={open} onClose={() => openDialog(null)} title="Bulk edit" width={860} testId="mass-change"
@@ -125,7 +128,12 @@ export function MassChangeDialog() {
           <Field label="New value"><Select value={value} onChange={(e) => setValue(e.target.value)}>{field.options!.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</Select></Field>
         )}
         {field.kind === "bool" && <Toggle checked={value === "true"} onChange={(v) => setValue(String(v))} label={field.label} />}
-        {needsValue && (
+        {needsValue && richValue && (
+          <Field label={op === "prepend" ? "Add before the existing text" : op === "append" ? "Add after the existing text" : "New content"} hint="Paste from Word, Google Docs or a web page: bullets, bold, colours and sizes are kept. Use the </> button to edit the HTML.">
+            <RichTextEditor value={value} onChange={setValue} minHeight={220} placeholder="Type or paste formatted text" testId="mass-rich-value" debounce={0} />
+          </Field>
+        )}
+        {needsValue && !richValue && (
           <Field label={op === "formula" ? "Formula" : op === "replace" ? "Find" : op === "round" ? "Decimals" : "Value"} hint={op === "formula" ? <>Use field names and functions: {FUNCTION_HELP.slice(0, 8).map((f) => f.sig).join(", ")}…</> : undefined}>
             <Input value={value} onChange={(e) => setValue(e.target.value)} placeholder={op === "formula" ? "=CHARM(regular_price * 1.1)" : op.includes("pct") ? "e.g. 10" : ""} className={op === "formula" ? "font-mono" : undefined} data-testid="mass-value" autoFocus />
           </Field>

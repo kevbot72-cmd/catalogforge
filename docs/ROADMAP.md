@@ -5,16 +5,17 @@
 Tested against WordPress 6.8.3 + WooCommerce 9.9.5 on MariaDB (PHP built-in server):
 
 - **Plugin smoke test (40 checks):** signing, replay protection, a variable product with global attributes plus categories created through references in one batch, idempotent SKU matching, conflict detection, media upload with client-made sizes and deduplication, category and media updates, export, preview (existing and unsaved products, coming-soon mode), delete.
-- **Engine integration tests (6):**
+- **Engine integration tests (7):**
   - the full cycle: pull → stage → push with images → conflict → resolve → revert from history → delta pull with remote deletion → category filter → preview;
   - the MySQL reader matching the plugin field-for-field on 1,000 products and every category;
   - the Local adapter auto-provisioning (re-activating the plugin and creating a key) and writing media directly to disk;
   - throughput;
   - custom fields: discovery over the connector and MySQL, reading, editing, pushing and conflict detection;
-  - media deletion: the attachment is removed on the store and from the cache, and the product loses the image.
+  - media deletion: the attachment is removed on the store and from the cache, and the product loses the image;
+  - formatted descriptions (lists, bold, colour, size) are stored by WooCommerce exactly as pushed.
 - **Unit tests:** 30 engine (cache, staging and undo, history, PHP serialization, signing, Local discovery, WordPress resize geometry, WebP pipeline, clone mapping) and 16 UI logic (formula engine, import planner, bulk edits).
 - **Catalogue tests:** planning (exclusions at every level, pagination, contents page numbers, continuous flow and divider pages), text wrapping, and full PDF renders of every layout with a template, links, QR codes and bookmarks.
-- **UI end-to-end (23 steps):** grid edit and paste, undo, palette, drawer and live preview, paste cleanup, bulk edit, import with validation, variation matrix, diff panel, push, history revert, category drag-nesting, Local discovery, export, custom fields, new-product tabs, catalogue (leave out a category, change layout, cover and header text, load a template PDF, create the full PDF), category tick boxes for selected products (sub-category only, with parents, untick a parent), media range select, select all, delete with undo, dark mode.
+- **UI end-to-end (24 steps):** grid edit and paste, undo, palette, drawer and live preview, paste cleanup, bulk edit, import with validation, variation matrix, diff panel, push, history revert, category drag-nesting, Local discovery, export, custom fields, new-product tabs, catalogue (leave out a category, change layout, cover and header text, load a template PDF, create the full PDF), category tick boxes for selected products (sub-category only, with parents, untick a parent), media range select, select all, delete with undo, pasting Google Docs text into bulk edit, dark mode.
 - **Real desktop app (Tauri on Linux):** loaded 6,695 products from the test store through the connector; switched to a Local site (MySQL pull and auto-provisioning); edited in the grid; pushed with ⌘S (verified in the database); live preview inside the app.
 
 Measured on the test machine (PHP built-in server, untuned MariaDB, so real hosting will differ):
@@ -24,6 +25,12 @@ Measured on the test machine (PHP built-in server, untuned MariaDB, so real host
 | Create via connector (full WooCommerce save path, 2,000 products) | ~50 products/s (was ~25/s before the writer optimisations) |
 | Pull via connector | ~740 products/s |
 | Pull via direct MySQL / Local | ~5,800 products/s (6,695 products in 1.2 s) |
+
+## New in 0.2.2
+
+- **Formatted text in bulk edit.** Setting, prepending or appending a description in Bulk edit now uses the full rich-text editor (larger, with the toolbar) instead of a one-line box, so pasted formatting and line breaks are kept.
+- **Pasting keeps your formatting.** Text pasted from Word, Google Docs or web pages keeps bullets and numbered lists, bold, italic, underline, links, text colour and text size, while fonts, Office markup and the document's base colour and size are dropped (so text still follows your theme). Word's typed bullets become real lists, and Google Docs bold (which it stores as styled spans) is recognised. WooCommerce stores the result unchanged (verified against a live store).
+- **Colour and size in the editor.** The editor toolbar has a text colour menu and a size picker, in the product editor as well as bulk edit.
 
 ## New in 0.2.1
 

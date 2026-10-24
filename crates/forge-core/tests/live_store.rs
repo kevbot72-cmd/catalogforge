@@ -430,3 +430,18 @@ async fn media_delete_removes_attachment_and_cache_entry() {
     assert!(server.media_for(&[media_id]).await.unwrap().is_empty(), "attachment deleted on the store");
     assert_eq!(server.catalog_by_ids(&[key.parse().unwrap()]).await.unwrap().products[0].image_id, 0);
 }
+
+#[tokio::test]
+async fn formatted_descriptions_survive_a_push() {
+    let Some(driver) = connector() else { return eprintln!("CF_TEST_URL not set; skipping") };
+    let tmp = tempfile::tempdir().unwrap();
+    let cache = Mutex::new(Cache::open(&tmp.path().join("c.db")).unwrap());
+    let s = sfx();
+    let html = r#"<p><strong>Warm</strong> and <span style="color: #dc2626">limited</span>, <span style="font-size: 20px">big</span> <em>news</em>.</p><ul><li>Wool</li><li><u>Zip</u></li></ul>"#;
+    cache.lock().unwrap().create(Entity::Product, obj(json!({ "name": format!("Rich {s}"), "type": "simple", "sku": format!("RICH-{s}"), "short_description": html }))).unwrap();
+    let r = sync::push(&driver, &cache, &MediaSettings::default(), "Rich text", no_progress()).await.unwrap();
+    assert!(r.errors.is_empty(), "{:?}", r.errors);
+    let id: i64 = cache.lock().unwrap().query(&ProductQuery { search: format!("RICH-{s}"), ..Default::default() }).unwrap().keys[0].parse().unwrap();
+    let stored = MysqlDriver::connect(&mysql_target(), None).await.unwrap().catalog_by_ids(&[id]).await.unwrap().products.remove(0).short_description;
+    assert_eq!(stored, html, "WooCommerce keeps bullets, bold, colour and size");
+}

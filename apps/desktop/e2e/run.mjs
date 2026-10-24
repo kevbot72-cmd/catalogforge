@@ -407,6 +407,46 @@ await step("media: select, select all, and delete selected (with undo)", async (
   expect((await present()) === 2, "undo restores them");
 });
 
+await step("bulk edit: paste formatted text into the short description", async () => {
+  await page.getByTestId("nav-products").click();
+  await page.getByTestId("search").fill("Trail");
+  await page.waitForTimeout(600);
+  await page.getByTestId("open-mass-change").click();
+  await page.getByTestId("mass-field").selectOption("short_description");
+  await page.getByTestId("mass-op").selectOption("set");
+  const ed = page.getByTestId("mass-rich-value");
+  await ed.click();
+  // What Google Docs puts on the clipboard: bold in spans, a base size and colour on everything.
+  await page.evaluate(() => {
+    const dt = new DataTransfer();
+    dt.setData("text/html", '<b style="font-weight:normal" id="docs-internal-guid-x"><p dir="ltr"><span style="font-size:11pt;color:#000000;font-weight:700">Built to last.</span><span style="font-size:11pt;color:#000000"> Now in </span><span style="font-size:11pt;color:#dc2626">red</span><span style="font-size:11pt;color:#000000"> and </span><span style="font-size:18pt;color:#000000">bigger</span></p><ul><li dir="ltr"><p dir="ltr"><span style="font-size:11pt;color:#000000">Waterproof</span></p></li><li dir="ltr"><p dir="ltr"><span style="font-size:11pt;color:#000000">Recycled</span></p></li></ul></b>');
+    dt.setData("text/plain", "Built to last. Now in red and bigger\nWaterproof\nRecycled");
+    document.querySelector('[data-testid="mass-rich-value"]').dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true }));
+  });
+  await page.waitForTimeout(600);
+  const html = await ed.innerHTML();
+  expect(/<strong>Built to last\.<\/strong>/.test(html), `bold kept: ${html}`);
+  expect(/color: (rgb\(220, 38, 38\)|#dc2626)/.test(html), `colour kept: ${html}`);
+  expect(/font-size: 18pt/.test(html), `size kept: ${html}`);
+  expect(/<ul><li><p>Waterproof<\/p><\/li><li><p>Recycled<\/p><\/li><\/ul>/.test(html), `bullets kept: ${html}`);
+  expect(!/11pt|#000000|docs-internal/.test(html), `base styling dropped: ${html}`);
+  await shot("23-bulk-rich-paste");
+  const label = await page.getByTestId("mass-apply").innerText();
+  expect(Number(label.replace(/\D/g, "")) > 0, `applies to products: ${label}`);
+  await page.getByTestId("mass-apply").click();
+  await page.getByTestId("mass-change").waitFor({ state: "hidden" });
+  // The product editor shows the formatted text.
+  await page.getByTestId("open-palette").click();
+  await page.getByTestId("palette").locator("input").fill("Trail");
+  await page.waitForTimeout(400);
+  await page.getByTestId("palette").locator('[cmdk-item][data-value^="product"]').first().click();
+  await page.getByRole("tab", { name: "General" }).click();
+  const short = await page.getByTestId("product-drawer").locator(".ProseMirror").first().innerHTML();
+  expect(short.includes("<strong>Built to last.</strong>") && short.includes("<ul>"), `drawer shows the formatting: ${short.slice(0, 200)}`);
+  await page.getByLabel("Close drawer").click();
+  await page.getByTestId("search").fill("");
+});
+
 await step("dark mode", async () => {
   await page.getByTestId("nav-products").click();
   await page.getByLabel("Toggle dark mode").click();

@@ -1,30 +1,65 @@
+import Color from "@tiptap/extension-color";
 import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import TextAlign from "@tiptap/extension-text-align";
+import TextStyle from "@tiptap/extension-text-style";
 import Underline from "@tiptap/extension-underline";
-import { EditorContent, useEditor, type Editor } from "@tiptap/react";
+import { EditorContent, Extension, useEditor, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import { AlignCenter, AlignLeft, Bold, Code2, Eraser, Heading2, Heading3, Italic, Link2, List, ListOrdered, Quote, Redo2, Underline as UIcon, Undo2 } from "lucide-react";
+import { AlignCenter, AlignLeft, Baseline, Bold, Code2, Eraser, Heading2, Heading3, Italic, Link2, List, ListOrdered, Quote, Redo2, Underline as UIcon, Undo2 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { cleanPastedHtml } from "../lib/pasteHtml";
 import { clsx } from "./ui";
 
-/** Strips Word/Google Docs/supplier-portal junk: inline styles, classes, fonts, spans, comments. */
-export function cleanPastedHtml(html: string): string {
-  let out = html
-    .replace(/<!--[\s\S]*?-->/g, "")
-    .replace(/<\/?(o:p|xml|meta|link|style|script|font|w:[^>]*)[^>]*>/gi, "")
-    .replace(/\s(class|style|lang|id|align|face|size|color|dir|data-[\w-]+)=("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
-    .replace(/<span>\s*<\/span>/gi, "")
-    .replace(/<\/?span[^>]*>/gi, "")
-    .replace(/<b>/gi, "<strong>")
-    .replace(/<\/b>/gi, "</strong>")
-    .replace(/<i>/gi, "<em>")
-    .replace(/<\/i>/gi, "</em>")
-    .replace(/(&nbsp;| )+/g, " ")
-    .replace(/<p>\s*<\/p>/gi, "");
-  // Google Docs wraps everything in <b id="docs-internal-guid-…">.
-  out = out.replace(/<strong>\s*(<(p|h\d|ul|ol)[\s>])/gi, "$1").replace(/(<\/(p|h\d|ul|ol)>)\s*<\/strong>/gi, "$1");
-  return out.trim();
+export { cleanPastedHtml };
+
+/** Font size as a text-style attribute, written as an inline style WordPress keeps. */
+const FontSize = Extension.create({
+  name: "fontSize",
+  addGlobalAttributes() {
+    return [
+      {
+        types: ["textStyle"],
+        attributes: {
+          fontSize: {
+            default: null,
+            parseHTML: (el: HTMLElement) => el.style.fontSize || null,
+            renderHTML: (attrs: { fontSize?: string | null }) => (attrs.fontSize ? { style: `font-size: ${attrs.fontSize}` } : {}),
+          },
+        },
+      },
+    ];
+  },
+});
+
+const SIZES = ["12px", "14px", "16px", "18px", "20px", "24px", "28px", "32px"];
+const SWATCHES = ["#111827", "#6b7280", "#dc2626", "#ea580c", "#ca8a04", "#16a34a", "#2563eb", "#7c3aed", "#db2777"];
+
+function ColorMenu({ editor }: { editor: Editor }) {
+  const [open, setOpen] = useState(false);
+  const current = (editor.getAttributes("textStyle").color as string | undefined) ?? "";
+  return (
+    <div className="relative">
+      <button type="button" title="Text colour" aria-label="Text colour" onMouseDown={(e) => e.preventDefault()} onClick={() => setOpen(!open)} className="flex flex-col items-center rounded px-1.5 pb-0.5 pt-1 text-muted hover:bg-sunken">
+        <Baseline size={14} />
+        <span className="mt-0.5 h-1 w-4 rounded-sm" style={{ background: current || "currentColor" }} />
+      </button>
+      {open && (
+        <div className="absolute left-0 z-50 mt-1 w-44 rounded-md border border-line bg-panel p-2 shadow-lg" onMouseLeave={() => setOpen(false)}>
+          <div className="grid grid-cols-5 gap-1">
+            {SWATCHES.map((c) => (
+              <button key={c} type="button" title={c} onMouseDown={(e) => e.preventDefault()} onClick={() => (editor.chain().focus().setColor(c).run(), setOpen(false))} className="h-6 w-6 rounded border border-line" style={{ background: c }} />
+            ))}
+            <label className="flex h-6 w-6 cursor-pointer items-center justify-center rounded border border-dashed border-line text-2xs text-muted" title="Any colour">
+              +
+              <input type="color" className="sr-only" onChange={(e) => editor.chain().focus().setColor(e.target.value).run()} />
+            </label>
+          </div>
+          <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => (editor.chain().focus().unsetColor().run(), setOpen(false))} className="mt-2 w-full rounded px-1 py-0.5 text-left text-xs text-muted hover:bg-sunken">Default colour</button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function Btn({ on, active, title, children }: { on: () => void; active?: boolean; title: string; children: ReactNode }) {
@@ -42,6 +77,18 @@ function Toolbar({ editor, source, setSource }: { editor: Editor; source: boolea
       <Btn title="Bold" active={editor.isActive("bold")} on={() => c().toggleBold().run()}><Bold size={15} /></Btn>
       <Btn title="Italic" active={editor.isActive("italic")} on={() => c().toggleItalic().run()}><Italic size={15} /></Btn>
       <Btn title="Underline" active={editor.isActive("underline")} on={() => c().toggleUnderline().run()}><UIcon size={15} /></Btn>
+      <ColorMenu editor={editor} />
+      <select
+        title="Text size"
+        aria-label="Text size"
+        className="h-7 rounded bg-transparent px-1 text-xs text-muted hover:bg-sunken focus:outline-none"
+        value={(editor.getAttributes("textStyle").fontSize as string | undefined) ?? ""}
+        onMouseDown={(e) => e.stopPropagation()}
+        onChange={(e) => (e.target.value ? c().setMark("textStyle", { fontSize: e.target.value }).run() : c().setMark("textStyle", { fontSize: null }).removeEmptyTextStyle().run())}
+      >
+        <option value="">Size</option>
+        {SIZES.map((sz) => <option key={sz} value={sz}>{sz.replace("px", "")}</option>)}
+      </select>
       <span className="mx-1 h-4 w-px bg-line" />
       <Btn title="Heading 2" active={editor.isActive("heading", { level: 2 })} on={() => c().toggleHeading({ level: 2 }).run()}><Heading2 size={15} /></Btn>
       <Btn title="Heading 3" active={editor.isActive("heading", { level: 3 })} on={() => c().toggleHeading({ level: 3 }).run()}><Heading3 size={15} /></Btn>
@@ -73,7 +120,7 @@ function Toolbar({ editor, source, setSource }: { editor: Editor; source: boolea
   );
 }
 
-export function RichTextEditor({ value, onChange, placeholder, minHeight = 220, testId }: { value: string; onChange: (html: string) => void; placeholder?: string; minHeight?: number; testId?: string }) {
+export function RichTextEditor({ value, onChange, placeholder, minHeight = 220, testId, debounce = 350 }: { value: string; onChange: (html: string) => void; placeholder?: string; minHeight?: number; testId?: string; debounce?: number }) {
   const [source, setSource] = useState(false);
   const [html, setHtml] = useState(value);
   const last = useRef(value);
@@ -81,7 +128,8 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 220, 
   const emit = (h: string) => {
     last.current = h;
     clearTimeout(timer.current);
-    timer.current = setTimeout(() => onChange(h), 350);
+    if (!debounce) return onChange(h);
+    timer.current = setTimeout(() => onChange(h), debounce);
   };
   const editor = useEditor({
     extensions: [
@@ -90,6 +138,9 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 220, 
       Link.configure({ openOnClick: false, autolink: true }),
       TextAlign.configure({ types: ["heading", "paragraph"] }),
       Placeholder.configure({ placeholder: placeholder ?? "Write something…" }),
+      TextStyle,
+      Color,
+      FontSize,
     ],
     content: value,
     editorProps: {
