@@ -148,14 +148,23 @@ class CF_Serializer {
 		return $out;
 	}
 
-	public static function category( WP_Term $t ) {
+	/**
+	 * @param WP_Term  $t         Term.
+	 * @param int|null $raw_count Stored count. WooCommerce filters term counts to include child
+	 *                            categories; the app aggregates itself, so it wants the raw value.
+	 */
+	public static function category( WP_Term $t, $raw_count = null ) {
+		if ( null === $raw_count ) {
+			global $wpdb;
+			$raw_count = (int) $wpdb->get_var( $wpdb->prepare( "SELECT count FROM {$wpdb->term_taxonomy} WHERE term_taxonomy_id = %d", $t->term_taxonomy_id ) );
+		}
 		$out = array(
 			'id'           => $t->term_id,
 			'parent'       => $t->parent,
 			'name'         => $t->name,
 			'slug'         => $t->slug,
 			'description'  => $t->description,
-			'count'        => (int) $t->count,
+			'count'        => (int) $raw_count,
 			'display_type' => (string) get_term_meta( $t->term_id, 'display_type', true ),
 			'image_id'     => (int) get_term_meta( $t->term_id, 'thumbnail_id', true ),
 			'banner_id'    => (int) get_term_meta( $t->term_id, '_cf_banner_id', true ),

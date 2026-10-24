@@ -151,7 +151,8 @@ check( 'category thumbnail set', ( $r5['results'][1]['record']['image_id'] ?? 0 
 check( 'media alt updated', ( $r5['results'][2]['record']['alt'] ?? '' ) === 'Updated alt' );
 
 echo "catalog export\n";
-[ $c, $cat ] = call( 'GET', '/catalog', array( 'limit' => 500 ) );
+$want = implode( ',', array( $by_ref['p1']['id'], $by_ref['v1']['id'], $by_ref['v2']['id'] ) );
+[ $c, $cat ] = call( 'GET', '/catalog', array( 'ids' => $want ) );
 $skus = array_column( $cat['products'] ?? array(), 'sku' );
 check( 'catalog includes new parent and variations', in_array( "TEE-$sfx", $skus, true ) && in_array( "TEE-$sfx-M-BLUE", $skus, true ) );
 check( 'catalog includes referenced media', in_array( $mid, array_column( $cat['media'] ?? array(), 'id' ), true ) );

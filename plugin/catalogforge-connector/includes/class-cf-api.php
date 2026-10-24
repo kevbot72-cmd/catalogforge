@@ -187,9 +187,14 @@ class CF_Api {
 	}
 
 	public static function taxonomy() {
+		global $wpdb;
+		$counts = array();
+		foreach ( $wpdb->get_results( "SELECT term_taxonomy_id, count FROM {$wpdb->term_taxonomy} WHERE taxonomy = 'product_cat'", ARRAY_N ) as $row ) {
+			$counts[ (int) $row[0] ] = (int) $row[1];
+		}
 		$cats = array();
 		foreach ( get_terms( array( 'taxonomy' => 'product_cat', 'hide_empty' => false ) ) as $t ) {
-			$cats[] = CF_Serializer::category( $t );
+			$cats[] = CF_Serializer::category( $t, $counts[ $t->term_taxonomy_id ] ?? 0 );
 		}
 		$tags = array();
 		foreach ( get_terms( array( 'taxonomy' => 'product_tag', 'hide_empty' => false ) ) as $t ) {

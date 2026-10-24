@@ -88,38 +88,40 @@ class CF_Writer {
 		// Categories referencing other new categories must come after them.
 		$indexed = $this->sort_categories( $indexed );
 
+		// Deferred housekeeping: WooCommerce recounts category/tag totals and clears a dozen
+		// transients on every single product save. During a batch those are postponed and done once.
 		wp_defer_term_counting( true );
-		if ( $this->options['transaction'] ) {
-			$wpdb->query( 'START TRANSACTION' );
+		add_filter( 'woocommerce_product_recount_terms', '__return_false' );
+		// SKU uniqueness is checked by find_product_id() and WC_Product::set_sku() before insert;
+		// WooCommerce's extra SKU lock can deadlock under concurrent batches.
+		add_filter( 'wc_product_pre_lock_on_sku', '__return_true' );
+		$memory_transients = ! wp_using_ext_object_cache();
+		$this->memory_mode = $memory_transients;
+		if ( $memory_transients ) {
+			// Transient reads/writes go to the per-request cache instead of wp_options. Every
+			// transient touched meanwhile is recorded and purged from the database afterwards.
+			wp_using_ext_object_cache( true );
+			add_action( 'all', array( $this, 'track_transient' ) );
 		}
 
 		$results = array();
 		foreach ( $indexed as list( $i, $op ) ) {
-			try {
-				$results[ $i ] = $this->apply( $op );
-			} catch ( Throwable $e ) {
-				$results[ $i ] = array(
-					'ref'    => $op['ref'] ?? null,
-					'ok'     => false,
-					'action' => 'error',
-					'error'  => $e->getMessage(),
-				);
-			}
+			$results[ $i ] = $this->apply_atomic( $op );
 		}
 
-		if ( $this->options['transaction'] ) {
-			$wpdb->query( 'COMMIT' );
+		if ( $memory_transients ) {
+			remove_action( 'all', array( $this, 'track_transient' ) );
+			wp_using_ext_object_cache( false );
 		}
+		remove_filter( 'wc_product_pre_lock_on_sku', '__return_true' );
+		remove_filter( 'woocommerce_product_recount_terms', '__return_false' );
 		wp_defer_term_counting( false );
 
 		foreach ( array_unique( $this->touched_parents ) as $parent_id ) {
 			WC_Product_Variable::sync( $parent_id );
-			wc_delete_product_transients( $parent_id );
 		}
-		foreach ( array_unique( $this->touched ) as $id ) {
-			wc_delete_product_transients( $id );
-		}
-		delete_transient( 'wc_term_counts' );
+		$this->recount_terms();
+		$this->purge_transients( $memory_transients );
 
 		// Records are serialized after commit and parent sync so they reflect final state.
 		if ( $this->options['return_records'] ) {
@@ -137,6 +139,133 @@ class CF_Writer {
 			'refs'       => (object) $this->refs,
 			'elapsed_ms' => (int) round( ( microtime( true ) - $start ) * 1000 ),
 		);
+	}
+
+	/** @var bool transients are held in the in-request cache for this batch */
+	private $memory_mode = false;
+
+	/** @var string[] transients set or deleted while transients were held in memory */
+	private $transients = array();
+
+	public function track_transient( $hook ) {
+		if ( 0 === strpos( $hook, 'delete_transient_' ) ) {
+			$this->transients[] = substr( $hook, 17 );
+		} elseif ( 0 === strpos( $hook, 'set_transient_' ) ) {
+			$this->transients[] = substr( $hook, 14 );
+		}
+	}
+
+	/**
+	 * Runs one operation in its own transaction. A deadlock or lock timeout makes InnoDB roll
+	 * back the transaction, so the operation is retried from scratch; an operation that fails
+	 * part-way is rolled back so no half-written product is left behind.
+	 */
+	private function apply_atomic( array $op ) {
+		global $wpdb, $EZSQL_ERROR;
+		$use_tx = ! empty( $this->options['transaction'] );
+		for ( $attempt = 1; ; $attempt++ ) {
+			$errors_before = is_array( $EZSQL_ERROR ) ? count( $EZSQL_ERROR ) : 0;
+			if ( $use_tx ) {
+				$wpdb->query( 'START TRANSACTION' );
+			}
+			try {
+				$result = $this->apply( $op );
+			} catch ( Throwable $e ) {
+				$result = array(
+					'ref'    => $op['ref'] ?? null,
+					'entity' => $op['entity'] ?? null,
+					'ok'     => false,
+					'action' => 'error',
+					'error'  => $e->getMessage(),
+				);
+			}
+			$lock_failure = false;
+			foreach ( array_slice( is_array( $EZSQL_ERROR ) ? $EZSQL_ERROR : array(), $errors_before ) as $err ) {
+				if ( preg_match( '/deadlock|lock wait timeout/i', (string) ( $err['error_str'] ?? '' ) ) ) {
+					$lock_failure = true;
+				}
+			}
+			$failed = empty( $result['ok'] ) && 'error' === ( $result['action'] ?? '' );
+			if ( $use_tx && ( $lock_failure || $failed ) ) {
+				$wpdb->query( 'ROLLBACK' );
+				if ( ! empty( $op['ref'] ) ) {
+					unset( $this->refs[ $op['ref'] ] );
+				}
+				// Drop anything cached from the rolled-back writes (only the in-request cache; a
+				// persistent object cache is never flushed wholesale).
+				if ( $this->memory_mode && function_exists( 'wp_cache_flush_runtime' ) ) {
+					wp_cache_flush_runtime();
+				}
+			} elseif ( $use_tx ) {
+				$wpdb->query( 'COMMIT' );
+			}
+			if ( $lock_failure && $attempt < 4 ) {
+				usleep( 50000 * $attempt );
+				continue;
+			}
+			if ( $lock_failure ) {
+				$result = array( 'ref' => $op['ref'] ?? null, 'entity' => $op['entity'] ?? null, 'ok' => false, 'action' => 'error', 'error' => 'Database lock contention; please retry.' );
+			}
+			return $result;
+		}
+	}
+
+	/**
+	 * WooCommerce's visibility-aware category/tag counts, once for every term the batch touched.
+	 */
+	private function recount_terms() {
+		if ( ! function_exists( '_wc_term_recount' ) ) {
+			return;
+		}
+		foreach ( array( 'product_cat', 'product_tag' ) as $taxonomy ) {
+			$terms = array();
+			foreach ( array_unique( array_merge( $this->touched, $this->touched_parents ) ) as $id ) {
+				$found = get_the_terms( $id, $taxonomy );
+				if ( is_array( $found ) ) {
+					foreach ( $found as $t ) {
+						$terms[ $t->term_id ] = $t->parent;
+					}
+				}
+			}
+			if ( $terms ) {
+				_wc_term_recount( $terms, get_taxonomy( $taxonomy ), false, false );
+			}
+		}
+		delete_transient( 'wc_term_counts' );
+	}
+
+	/**
+	 * Deletes product transients for everything touched with a few bulk queries instead of
+	 * ~20 queries per product.
+	 */
+	private function purge_transients( $bulk ) {
+		global $wpdb;
+		$ids = array_unique( array_merge( $this->touched, $this->touched_parents ) );
+		if ( ! $bulk ) {
+			foreach ( $ids as $id ) {
+				wc_delete_product_transients( $id );
+			}
+			return;
+		}
+		$names = array_merge(
+			array( 'wc_products_onsale', 'wc_featured_products', 'wc_outofstock_count', 'wc_low_stock_count', 'wc_term_counts', 'wc_attribute_taxonomies' ),
+			$this->transients
+		);
+		foreach ( $ids as $id ) {
+			foreach ( array( 'wc_product_children_', 'wc_var_prices_', 'wc_child_has_weight_', 'wc_child_has_dimensions_', 'wc_related_' ) as $prefix ) {
+				$names[] = $prefix . (int) $id;
+			}
+		}
+		foreach ( array_chunk( $names, 400 ) as $chunk ) {
+			$options = array();
+			foreach ( $chunk as $n ) {
+				$options[] = '_transient_' . $n;
+				$options[] = '_transient_timeout_' . $n;
+			}
+			$placeholders = implode( ',', array_fill( 0, count( $options ), '%s' ) );
+			$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->options} WHERE option_name IN ($placeholders)", $options ) ); // phpcs:ignore WordPress.DB.PreparedSQL
+		}
+		wp_cache_delete( 'alloptions', 'options' );
 	}
 
 	private function sort_categories( array $indexed ) {
@@ -484,7 +613,13 @@ class CF_Writer {
 		return $tax;
 	}
 
-	private function ensure_attribute_term( $taxonomy, $name ) {
+	/**
+	 * @param string   $taxonomy Attribute taxonomy.
+	 * @param string   $name     Term name or slug.
+	 * @param int|null $position For newly created terms: their sort position, so "S, M, L" keeps
+	 *                           that order instead of WooCommerce's alphabetical fallback.
+	 */
+	private function ensure_attribute_term( $taxonomy, $name, $position = null ) {
 		$name = (string) $name;
 		$term = get_term_by( 'name', $name, $taxonomy );
 		if ( ! $term ) {
@@ -500,6 +635,9 @@ class CF_Writer {
 			}
 			throw new RuntimeException( $created->get_error_message() );
 		}
+		if ( null !== $position ) {
+			update_term_meta( (int) $created['term_id'], 'order', (int) $position );
+		}
 		return get_term( (int) $created['term_id'], $taxonomy );
 	}
 
@@ -512,8 +650,8 @@ class CF_Writer {
 			if ( '' !== $taxonomy ) {
 				$tax = $this->ensure_attribute_taxonomy( $taxonomy, $a['name'] ?? '' );
 				$ids = array();
-				foreach ( $options as $o ) {
-					$ids[] = (int) $this->ensure_attribute_term( $tax, $o )->term_id;
+				foreach ( $options as $i => $o ) {
+					$ids[] = (int) $this->ensure_attribute_term( $tax, $o, $i )->term_id;
 				}
 				$attr->set_id( wc_attribute_taxonomy_id_by_name( $tax ) );
 				$attr->set_name( $tax );
