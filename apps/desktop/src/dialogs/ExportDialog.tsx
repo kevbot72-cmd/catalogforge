@@ -4,6 +4,7 @@ import { columnsFor, presetsFor, type ColumnDef } from "../components/ProductGri
 import type { CustomField } from "../backend/types";
 import { Button, clsx, Field, Modal, Select, Toggle } from "../components/ui";
 import { buildExport, type ExportColumn, type ExportFormat } from "../lib/exporter";
+import { loadViews, viewColumns } from "../lib/views";
 import { useApp } from "../store/app";
 
 const NUMERIC = new Set(["price", "int"]);
@@ -17,14 +18,7 @@ const EXTRA: ExportColumn[] = [
 function currentColumns(fields?: CustomField[]): ColumnDef[] {
   const presets = presetsFor(fields);
   const all = columnsFor(fields);
-  let ids: string[] = presets.Default;
-  try {
-    const preset = localStorage.getItem("cf.preset") ?? "Default";
-    ids = preset === "Custom" ? JSON.parse(localStorage.getItem("cf.columns") ?? "null") ?? ids : presets[preset] ?? ids;
-  } catch {
-    /* defaults */
-  }
-  return ids.map((id) => all.find((c) => c.id === id)!).filter(Boolean);
+  return viewColumns(loadViews(presets), presets).map((id) => all.find((c) => c.id === id)!).filter(Boolean);
 }
 
 export function ExportDialog() {

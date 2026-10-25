@@ -113,7 +113,7 @@ function plain(html: string) {
   return html.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
 }
 
-export function ProductGrid({ columns }: { columns: ColumnDef[] }) {
+export function ProductGrid({ columns, onColumnMoved }: { columns: ColumnDef[]; onColumnMoved?: (from: number, to: number) => void }) {
   const { backend, storeId, query, version, media, taxonomy, dark, appearance, stage, setQuery, setSelection, openDrawer, toast, setFocusKey, setPanel, selection: picked } = useApp();
   const [dropdown, setDropdown] = useState<CellDropdownState | null>(null);
   const ref = useRef<DataEditorRef>(null);
@@ -423,7 +423,9 @@ export function ProductGrid({ columns }: { columns: ColumnDef[] }) {
         rowSelectionBlending="mixed"
         smoothScrollX
         smoothScrollY
-        freezeColumns={3}
+        freezeColumns={2}
+        // Drag a column header to move it; Glide slides the other columns aside to show where it lands.
+        onColumnMoved={onColumnMoved}
         rowHeight={appearance.density === "compact" ? 30 : 36}
         headerHeight={34}
         width="100%"

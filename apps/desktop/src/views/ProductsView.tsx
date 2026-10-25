@@ -1,8 +1,10 @@
-import { Columns3, Copy, Download, FileUp, Plus, RefreshCw, Search, Sparkles, Trash2, Undo2 } from "lucide-react";
+import { Copy, Download, FileUp, Plus, RefreshCw, Search, Sparkles, Trash2, Undo2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { EditPanel } from "../components/EditPanel";
 import { columnsFor, presetsFor, ProductGrid } from "../components/ProductGrid";
 import { Button, clsx, Input, Select } from "../components/ui";
+import { ViewsMenu } from "../components/ViewsMenu";
+import { loadViews, moveColumn, saveViews, setViewColumns, viewColumns, type ViewState } from "../lib/views";
 import { useApp } from "../store/app";
 
 function Chip({ active, onClick, children, testId }: { active: boolean; onClick: () => void; children: React.ReactNode; testId?: string }) {
@@ -17,21 +19,6 @@ export function ProductsView() {
   const { query, setQuery, selection, openDialog, create, openDrawer, remove, summary, undo, pull, info } = useApp();
   const panelDock = useApp((s) => s.panel.dock);
   const [search, setSearch] = useState(query.search ?? "");
-  const [preset, setPreset] = useState<string>(() => {
-    try {
-      return localStorage.getItem("cf.preset") ?? "Default";
-    } catch {
-      return "Default";
-    }
-  });
-  const [custom, setCustom] = useState<string[] | null>(() => {
-    try {
-      return JSON.parse(localStorage.getItem("cf.columns") ?? "null");
-    } catch {
-      return null;
-    }
-  });
-  const [picker, setPicker] = useState(false);
   useEffect(() => {
     const t = setTimeout(() => search !== (query.search ?? "") && setQuery({ search }), 200);
     return () => clearTimeout(t);
@@ -39,28 +26,13 @@ export function ProductsView() {
   const fields = info?.profile.custom_fields;
   const allColumns = useMemo(() => columnsFor(fields), [fields]);
   const presets = useMemo(() => presetsFor(fields), [fields]);
-  const columnIds = preset === "Custom" && custom ? custom : presets[preset] ?? presets.Default;
-  const columns = useMemo(() => columnIds.map((id) => allColumns.find((c) => c.id === id)!).filter(Boolean), [columnIds, allColumns]);
-  const savePreset = (p: string) => {
-    setPreset(p);
-    try {
-      localStorage.setItem("cf.preset", p);
-    } catch {
-      /* ignore */
-    }
+  const [views, setViews] = useState<ViewState>(() => loadViews(presetsFor(fields)));
+  const changeViews = (next: ViewState) => {
+    setViews(next);
+    saveViews(next);
   };
-
-  const toggleColumn = (id: string) => {
-    const base = preset === "Custom" && custom ? custom : columnIds;
-    const next = base.includes(id) ? base.filter((x) => x !== id) : [...base, id];
-    setCustom(next);
-    savePreset("Custom");
-    try {
-      localStorage.setItem("cf.columns", JSON.stringify(next));
-    } catch {
-      /* ignore */
-    }
-  };
+  const columnIds = useMemo(() => viewColumns(views, presets).filter((id) => allColumns.some((c) => c.id === id)), [views, presets, allColumns]);
+  const columns = useMemo(() => columnIds.map((id) => allColumns.find((c) => c.id === id)!), [columnIds, allColumns]);
 
   return (
     <div className="flex h-full min-w-0 flex-col">
@@ -88,26 +60,7 @@ export function ProductsView() {
         <Chip active={!!query.include_variations} onClick={() => setQuery({ include_variations: !query.include_variations })}>Show variations</Chip>
         {summary.conflicts > 0 && <Chip active={!!query.only_conflicts} onClick={() => setQuery({ only_conflicts: !query.only_conflicts })}>Conflicts ({summary.conflicts})</Chip>}
         <span className="flex-1" />
-        <div className="relative">
-          <Button size="sm" variant="ghost" icon={<Columns3 size={14} />} onClick={() => setPicker(!picker)} data-testid="views-button">{preset}</Button>
-          {picker && (
-            <div className="absolute right-0 z-40 mt-1 w-64 rounded-lg border border-line bg-panel p-2 shadow-xl" onMouseLeave={() => setPicker(false)} data-testid="views-menu">
-              <div className="mb-1 px-1 text-2xs font-semibold uppercase text-muted">Saved views</div>
-              <div className="mb-2 flex flex-wrap gap-1">
-                {Object.keys(presets).map((p) => <Chip key={p} active={preset === p} onClick={() => savePreset(p)}>{p}</Chip>)}
-                {custom && <Chip active={preset === "Custom"} onClick={() => savePreset("Custom")}>Custom</Chip>}
-              </div>
-              <div className="mb-1 px-1 text-2xs font-semibold uppercase text-muted">Columns</div>
-              <div className="max-h-64 overflow-auto">
-                {allColumns.filter((c) => c.title).map((c) => (
-                  <label key={c.id} className="flex items-center gap-2 rounded px-1 py-0.5 text-[13px] hover:bg-sunken">
-                    <input type="checkbox" checked={columnIds.includes(c.id)} onChange={() => toggleColumn(c.id)} /> {c.title}
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
+        <ViewsMenu state={views} onChange={changeViews} builtIns={presets} allColumns={allColumns} columnIds={columnIds} />
         <Button size="sm" variant="ghost" icon={<RefreshCw size={14} />} onClick={() => pull(false)} title={`Sync from store · last ${info?.last_pull ? new Date(info.last_pull * 1000).toLocaleTimeString() : "never"}`}>Sync</Button>
         <Button size="sm" variant="ghost" icon={<Undo2 size={14} />} disabled={!summary.can_undo} onClick={undo} title="Undo last change (⌘Z)" data-testid="undo">Undo</Button>
         <Button size="sm" icon={<Download size={14} />} onClick={() => openDialog("export")} title="Export to Excel or CSV" data-testid="open-export">Export{selection.length ? ` (${selection.length})` : ""}</Button>
@@ -129,7 +82,7 @@ export function ProductsView() {
       </div>
       <div className={clsx("flex min-h-0 flex-1", panelDock === "bottom" && "flex-col")}>
         <div className="min-h-0 min-w-0 flex-1">
-          <ProductGrid columns={columns} />
+          <ProductGrid columns={columns} onColumnMoved={(from, to) => changeViews(setViewColumns(views, moveColumn(columnIds, from, to)))} />
         </div>
         <EditPanel />
       </div>

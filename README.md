@@ -11,7 +11,7 @@ It replaces the workflow of tools like eMagicOne Store Manager with a modern, cr
 | Area | What you get |
 |---|---|
 | **Connections** | Four connection types behind one interface: **Local (Flywheel)** with zero setup, the **CatalogForge Connector** plugin (recommended for live stores), the stock **WooCommerce REST API** (no plugin), and **direct MySQL** for very fast reads. |
-| **Spreadsheet grid** | Canvas-rendered grid that stays smooth at 100k+ rows. Edit inline, paste ranges from Excel or Google Sheets, drag-fill, multi-select, sort, saved column views (Pricing, Inventory, Shipping, SEO), list cells (status, stock status, visibility, type) that open a dropdown in the grid and can apply to every ticked row, and expandable variations (▸ in front of the name). |
+| **Spreadsheet grid** | Canvas-rendered grid that stays smooth at 100k+ rows. Edit inline, paste ranges from Excel or Google Sheets, drag-fill, multi-select, sort, saved column views (built-in Pricing, Inventory, Shipping and SEO, plus your own named views), drag-and-drop column order, list cells (status, stock status, visibility, type) that open a dropdown in the grid and can apply to every ticked row, and expandable variations (▸ in front of the name). |
 | **Edit panel** | A panel under the grid (or docked on the right) that edits every ticked product at once, in WooCommerce's sections: content, general, inventory, shipping, linked products, attributes, advanced, categories, tags, gallery, custom fields, SEO and brands. Fields where products differ say **Mixed** with the range; prices and stock take quick maths (`+10%`, `-5`, `=regular_price*0.8`) with a live count of what changes. Find any field, show only the ones that differ, undo per field, resize, fold with Ctrl+E. |
 | **Safe by design** | Nothing touches the store until you **Push**. Every edit is staged as a diff (green = new, yellow = changed, red = deleted). There is one-step **Undo** for any edit or bulk operation, field-level **conflict detection** if someone edits the same field in wp-admin, and a **History** of every push with one-click **Revert**. |
 | **Import** | Drop a CSV/XLSX/ODS/JSON file plus an image folder. Columns are auto-mapped (including Shopify exports). You can transform values with Excel-style formulas, group rows into variable products, create missing categories from paths like `Apparel > Tees`, match images by file name or by SKU, validate before anything is staged, and save mappings per supplier. |
@@ -68,7 +68,7 @@ To try the UI without any store, run `npm run dev` and open http://localhost:142
 cargo test -p forge-core --lib                  # engine unit tests
 cd apps/desktop && npm test                      # formula, import and bulk-edit tests
 npm run build && npx vite preview --port 4173 &  # then:
-npm run e2e                                      # 30-step UI test on demo data
+npm run e2e                                      # 31-step UI test on demo data
 
 # Against a real WordPress + WooCommerce with the plugin active:
 php plugin/tests/smoke.php https://store.test KEY SECRET

@@ -651,6 +651,47 @@ await step("appearance: version badge opens Settings; theme and close-button sty
   await page.getByTestId("appearance-mode").getByRole("radio", { name: "Light" }).click();
 });
 
+await step("views: new view, rename, drag a column, kept after closing; delete", async () => {
+  await page.getByTestId("nav-products").click();
+  await page.getByTestId("views-button").click();
+  await page.getByTestId("view-new").click();
+  await page.getByTestId("view-new-input").fill("Stocktake");
+  await page.getByTestId("view-new-input").press("Enter");
+  expect((await page.getByTestId("views-button").innerText()).includes("Stocktake"), "new view is open");
+  await page.getByLabel("Rename Stocktake").click();
+  await page.getByTestId("view-rename-input").fill("Weekly stocktake");
+  await page.getByTestId("view-rename-input").press("Enter");
+  await shot("25-views-menu");
+  await page.keyboard.press("Escape");
+  expect((await page.getByTestId("views-button").innerText()).includes("Weekly stocktake"), "renamed");
+  // Drag the Price header in front of SKU.
+  const hy = box.y + 17;
+  const from = box.x + 734 + 40;
+  const to = box.x + 44 + 44 + 300 + 20;
+  await page.mouse.move(from, hy);
+  await page.mouse.down();
+  for (let i = 1; i <= 12; i++) await page.mouse.move(from + ((to - from) * i) / 12, hy, { steps: 2 });
+  await page.mouse.up();
+  await page.waitForTimeout(400);
+  const order = () => page.evaluate(() => {
+    const s = JSON.parse(localStorage.getItem("cf.views") ?? "{}");
+    return s.views?.find((v) => v.id === s.active)?.columns ?? [];
+  });
+  const cols = await order();
+  expect(cols.indexOf("regular_price") === cols.indexOf("sku") - 1, `price moved before SKU: ${cols.join(",")}`);
+  // Closing and reopening the app keeps the view and its column order.
+  await page.reload();
+  // (Demo data lives in memory, so the store may be empty after a reload; the views are what matter.)
+  await page.getByTestId("views-button").waitFor({ timeout: 15000 });
+  expect((await page.getByTestId("views-button").innerText()).includes("Weekly stocktake"), "view kept after reopening");
+  expect((await order()).join() === cols.join(), "column order kept after reopening");
+  page.once("dialog", (d) => d.accept());
+  await page.getByTestId("views-button").click();
+  await page.getByLabel("Delete Weekly stocktake").click();
+  await page.keyboard.press("Escape");
+  expect((await page.getByTestId("views-button").innerText()).includes("Default"), "back on Default after deleting");
+});
+
 await step("dark mode", async () => {
   await page.getByTestId("nav-products").click();
   await page.getByLabel("Toggle dark mode").click();

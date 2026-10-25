@@ -15,9 +15,9 @@ Tested against WordPress 6.8.3 + WooCommerce 9.9.5 on MariaDB (PHP built-in serv
   - formatted descriptions (lists, bold, colour, size) are stored by WooCommerce exactly as pushed;
   - migration of a whole store (11,742 products) into a second, empty WooCommerce store, verified product by product, with a second run creating nothing;
   - up-sells, cross-sells, brands, purchase note, "limit one per order" and reviews pushed and read back identically through the connector and direct MySQL.
-- **Unit tests:** 30 engine (cache, staging and undo, history, PHP serialization, signing, Local discovery, WordPress resize geometry, WebP pipeline, clone mapping) and 51 UI logic (formula engine, import planner, bulk edits, edit-panel mixed values and quick maths).
+- **Unit tests:** 30 engine (cache, staging and undo, history, PHP serialization, signing, Local discovery, WordPress resize geometry, WebP pipeline, clone mapping) and 54 UI logic (formula engine, import planner, bulk edits, edit-panel mixed values and quick maths).
 - **Catalogue tests:** planning (exclusions at every level, pagination, contents page numbers, continuous flow and divider pages), text wrapping, and full PDF renders of every layout with a template, links, QR codes and bookmarks.
-- **UI end-to-end (30 steps):** grid edit and paste, undo, palette, drawer and live preview, paste cleanup, bulk edit, import with validation, variation matrix, diff panel, push, history revert, category drag-nesting, Local discovery, export, custom fields, new-product tabs, catalogue (leave out a category, change layout, cover and header text, load a template PDF, create the full PDF), category tick boxes for selected products (sub-category only, with parents, untick a parent), media range select, select all, delete with undo, pasting Google Docs text into bulk edit, push confirmation (No keeps changes staged, Yes pushes), Batch Builder (images matched and swapped, CSV export, batch added to the store, numbering continues), products in a category with tick boxes (sub-category products, tick, untick, add from the store), migration into an empty store (pre-flight, prepare, push, verify, re-run skips everything), grid dropdown cells (keyboard choice, apply to all ticked rows), the ▸ in front of a variable product's name, the edit panel (tick three products, Mixed values, +10% on all, stock status, add a tag to all, discard), docking it on the right, folding and Ctrl+E, the version badge, themes and close-button styles, dark mode.
+- **UI end-to-end (31 steps):** grid edit and paste, undo, palette, drawer and live preview, paste cleanup, bulk edit, import with validation, variation matrix, diff panel, push, history revert, category drag-nesting, Local discovery, export, custom fields, new-product tabs, catalogue (leave out a category, change layout, cover and header text, load a template PDF, create the full PDF), category tick boxes for selected products (sub-category only, with parents, untick a parent), media range select, select all, delete with undo, pasting Google Docs text into bulk edit, push confirmation (No keeps changes staged, Yes pushes), Batch Builder (images matched and swapped, CSV export, batch added to the store, numbering continues), products in a category with tick boxes (sub-category products, tick, untick, add from the store), migration into an empty store (pre-flight, prepare, push, verify, re-run skips everything), grid dropdown cells (keyboard choice, apply to all ticked rows), the ▸ in front of a variable product's name, the edit panel (tick three products, Mixed values, +10% on all, stock status, add a tag to all, discard), docking it on the right, folding and Ctrl+E, the version badge, themes and close-button styles, saved views (new, rename, drag a column header, kept after reopening, delete), dark mode.
 - **Real desktop app (Tauri on Linux):** loaded 6,695 products from the test store through the connector; switched to a Local site (MySQL pull and auto-provisioning); edited in the grid; pushed with ⌘S (verified in the database); live preview inside the app.
 
 Measured on the test machine (PHP built-in server, untuned MariaDB, so real hosting will differ):
@@ -27,6 +27,16 @@ Measured on the test machine (PHP built-in server, untuned MariaDB, so real host
 | Create via connector (full WooCommerce save path, 2,000 products) | ~50 products/s (was ~25/s before the writer optimisations) |
 | Pull via connector | ~740 products/s |
 | Pull via direct MySQL / Local | ~5,800 products/s (6,695 products in 1.2 s) |
+
+## New in 0.5.1
+
+- **Saved views** (the views button on the products page, which shows the open view's name):
+  - **New view from these columns** saves the current columns under a name you choose.
+  - Your own views have **Rename** (pencil) and **Delete** (red bin) buttons; the old single "Custom" view becomes a named view you can rename.
+  - Changing columns saves into the open view. A built-in view you've changed shows "changed" with a button to put it back.
+  - The column list in the menu can be dragged into a new order, with a line showing where the column will go.
+- **Move columns by dragging their header** in the grid. The column follows the mouse and the others slide aside to show where it will land; the new order is saved into the open view.
+- Views, column order and the open view are kept when you close CatalogForge. Export's "current view" uses them too.
 
 ## New in 0.5.0
 
