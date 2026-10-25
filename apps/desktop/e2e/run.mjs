@@ -16,8 +16,19 @@ page.on("pageerror", (e) => errors.push(String(e)));
 page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
 
 let failed = 0;
+const grid = page.getByTestId("product-grid");
+let box = null;
+/** Opens the Products page and measures where the grid is. */
+async function onProducts() {
+  await page.getByTestId("nav-products").click();
+  await grid.waitFor();
+  await page.waitForTimeout(300);
+  box = await grid.boundingBox();
+}
 async function step(name, fn, timeout = 60000) {
   try {
+    // The toolbar can wrap differently (e.g. with the Changes panel open), so re-measure the grid.
+    if (await grid.isVisible()) box = (await grid.boundingBox()) ?? box;
     await Promise.race([fn(), new Promise((_, rej) => setTimeout(() => rej(new Error(`step timed out after ${timeout / 1000}s`)), timeout))]);
     console.log("  ok  ", name);
   } catch (e) {
@@ -42,8 +53,7 @@ await step("grid loads demo catalog", async () => {
   await shot("01-products-grid");
 });
 
-const grid = page.getByTestId("product-grid");
-const box = await grid.boundingBox();
+box = await grid.boundingBox();
 // Layout: row markers (~44px) | image 44 | name 300 | sku 140 | type 96 | status 110 | price …
 const cell = (x, row) => ({ x: box.x + x, y: box.y + 34 + 18 + row * 36 });
 
@@ -251,7 +261,7 @@ await step("add store: Local sites are discovered", async () => {
 });
 
 await step("export: dialog offers Excel/CSV and downloads a valid workbook", async () => {
-  await page.getByTestId("nav-products").click();
+  await onProducts();
   await page.getByTestId("open-export").click();
   await page.getByTestId("export-dialog").waitFor();
   await page.getByTestId("export-xlsx").click();
@@ -272,7 +282,7 @@ await step("custom fields: discover, pick, then edit in grid view and product ta
   await shot("16-custom-fields-settings");
   await page.getByTestId("cf-save").click();
   await page.getByText("Custom fields saved").waitFor();
-  await page.getByTestId("nav-products").click();
+  await onProducts();
   if ((await page.getByTestId("filter-changed").getAttribute("class")).includes("text-accent")) await page.getByTestId("filter-changed").click();
   await page.getByTestId("views-button").click();
   await page.getByTestId("views-menu").getByRole("button", { name: "Custom fields", exact: true }).click();
@@ -350,7 +360,7 @@ await step("catalogue: leave out a category, restyle, use a PDF template and cre
 }, 300000);
 
 await step("categories: tick and untick parent and sub-categories for selected products", async () => {
-  await page.getByTestId("nav-products").click();
+  await onProducts();
   await page.getByTestId("search").fill("Trail");
   await page.waitForTimeout(600);
   await page.mouse.click(cell(22, 0).x, cell(22, 0).y);
@@ -416,7 +426,7 @@ await step("media: select, select all, and delete selected (with undo)", async (
 });
 
 await step("bulk edit: paste formatted text into the short description", async () => {
-  await page.getByTestId("nav-products").click();
+  await onProducts();
   await page.getByTestId("search").fill("Trail");
   await page.waitForTimeout(600);
   await page.getByTestId("open-mass-change").click();
@@ -556,7 +566,7 @@ await step("migration: pre-flight, prepare, push and verify into an empty store"
 }, 120000);
 
 await step("grid: list cells open a dropdown; the ▸ in the name shows variations", async () => {
-  await page.getByTestId("nav-products").click();
+  await onProducts();
   await page.getByTestId("search").fill("");
   await page.waitForTimeout(500);
   const before = await pending();
@@ -651,8 +661,31 @@ await step("appearance: version badge opens Settings; theme and close-button sty
   await page.getByTestId("appearance-mode").getByRole("radio", { name: "Light" }).click();
 });
 
+await step("select categories box filters the products", async () => {
+  await onProducts();
+  await page.getByTestId("search").fill("");
+  await page.waitForTimeout(500);
+  const all = Number(await grid.getAttribute("data-rows"));
+  await page.getByTestId("category-filter").click();
+  await page.getByLabel("Find a category").fill("Mugs");
+  await page.getByLabel("Find a category").press("Enter");
+  await page.waitForTimeout(500);
+  const some = Number(await grid.getAttribute("data-rows"));
+  expect(some > 0 && some < all, `filtered ${all} → ${some}`);
+  expect((await page.getByTestId("category-filter").innerText()).includes("Mugs"), "box shows the category");
+  // A parent includes its sub-categories.
+  await page.getByTestId("category-filter").click();
+  await page.getByTestId("category-filter-menu").getByRole("option", { name: /^Home/ }).click();
+  await page.waitForTimeout(500);
+  expect(Number(await grid.getAttribute("data-rows")) > some, "parent shows its sub-categories' products too");
+  await shot("26-category-filter");
+  await page.getByLabel("Clear category filter").click();
+  await page.waitForTimeout(500);
+  expect(Number(await grid.getAttribute("data-rows")) === all, "cleared");
+});
+
 await step("views: new view, rename, drag a column, kept after closing; delete", async () => {
-  await page.getByTestId("nav-products").click();
+  await onProducts();
   await page.getByTestId("views-button").click();
   await page.getByTestId("view-new").click();
   await page.getByTestId("view-new-input").fill("Stocktake");
@@ -693,7 +726,7 @@ await step("views: new view, rename, drag a column, kept after closing; delete",
 });
 
 await step("dark mode", async () => {
-  await page.getByTestId("nav-products").click();
+  await onProducts();
   await page.getByLabel("Toggle dark mode").click();
   await page.waitForTimeout(500);
   await shot("14-dark-mode");

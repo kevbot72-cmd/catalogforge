@@ -80,7 +80,7 @@ export function ViewsMenu({ state, onChange, builtIns, allColumns, columnIds }: 
         {viewName(state)}
       </Button>
       {open && (
-        <div className="absolute right-0 z-40 mt-1 w-80 rounded-lg border border-line bg-panel p-2 shadow-xl" data-testid="views-menu">
+        <div className="absolute left-0 z-40 mt-1 w-80 rounded-lg border border-line bg-panel p-2 shadow-xl" data-testid="views-menu">
           <div className="mb-1 px-1 text-2xs font-semibold uppercase text-muted">Views</div>
           <div className="space-y-px">
             {rows.map((r) =>

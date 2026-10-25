@@ -68,7 +68,7 @@ To try the UI without any store, run `npm run dev` and open http://localhost:142
 cargo test -p forge-core --lib                  # engine unit tests
 cd apps/desktop && npm test                      # formula, import and bulk-edit tests
 npm run build && npx vite preview --port 4173 &  # then:
-npm run e2e                                      # 31-step UI test on demo data
+npm run e2e                                      # 32-step UI test on demo data
 
 # Against a real WordPress + WooCommerce with the plugin active:
 php plugin/tests/smoke.php https://store.test KEY SECRET
