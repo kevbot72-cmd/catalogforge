@@ -3,6 +3,7 @@ import pkg from "../../package.json";
 import type { MediaSettings } from "../backend/types";
 import { Badge, Button, Field, Input, Select, Toggle } from "../components/ui";
 import { useApp } from "../store/app";
+import { AppearanceSettings } from "./AppearanceSettings";
 import { CustomFieldsSettings } from "./CustomFieldsSettings";
 
 export function SettingsView() {
@@ -19,7 +20,8 @@ export function SettingsView() {
   const caps = info?.capabilities;
   return (
     <div className="h-full overflow-auto">
-      <div className="mx-auto max-w-3xl space-y-8 p-6">
+      <div className="mx-auto max-w-4xl space-y-8 p-6">
+        <AppearanceSettings />
         <section>
           <h2 className="mb-3 text-sm font-semibold">Image processing</h2>
           {ms && (

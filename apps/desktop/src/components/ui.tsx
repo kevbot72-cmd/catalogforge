@@ -6,7 +6,8 @@ import type { LocalFile, MediaValue, Media } from "../backend/types";
 
 export { clsx };
 
-type BtnVariant = "primary" | "secondary" | "ghost" | "danger";
+/** "close" is for close, cancel, clear, discard and remove: styled per Settings → Appearance. */
+type BtnVariant = "primary" | "secondary" | "ghost" | "danger" | "close";
 export const Button = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLButtonElement> & { variant?: BtnVariant; size?: "sm" | "md"; icon?: ReactNode }>(
   ({ variant = "secondary", size = "md", icon, className, children, ...rest }, ref) => (
     <button
@@ -18,6 +19,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLBut
         variant === "secondary" && "border border-line bg-panel hover:bg-sunken",
         variant === "ghost" && "text-muted hover:bg-sunken hover:text-fg",
         variant === "danger" && "bg-removed text-white hover:bg-removed/90",
+        variant === "close" && "cf-close",
         className,
       )}
       {...rest}
@@ -27,6 +29,15 @@ export const Button = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLBut
     </button>
   ),
 );
+
+/** The ✕ that closes a window or panel, in the close-button style so it is easy to spot. */
+export function CloseX({ onClick, label = "Close", size = 15, className, testId }: { onClick: () => void; label?: string; size?: number; className?: string; testId?: string }) {
+  return (
+    <button type="button" onClick={onClick} className={clsx("cf-close inline-flex h-7 min-w-7 items-center justify-center rounded-md px-1.5", className)} aria-label={label} title={label} data-testid={testId}>
+      <X size={size} />
+    </button>
+  );
+}
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(({ className, ...rest }, ref) => (
   <input ref={ref} className={clsx("h-8 rounded-md border border-line bg-panel px-2.5 text-[13px] placeholder:text-muted focus:border-accent focus:outline-none", !/\bw-/.test(className ?? "") && "w-full", className)} {...rest} />
@@ -99,9 +110,7 @@ export function Modal({ open, onClose, title, children, footer, width = 640, tes
       <div data-testid={testId} role="dialog" aria-label={typeof title === "string" ? title : undefined} className="flex max-h-[84vh] w-full flex-col overflow-hidden rounded-xl border border-line bg-panel shadow-2xl" style={{ maxWidth: width }}>
         <div className="flex items-center justify-between border-b border-line px-4 py-3">
           <h2 className="text-sm font-semibold">{title}</h2>
-          <button onClick={onClose} className="rounded p-1 text-muted hover:bg-sunken" aria-label="Close">
-            <X size={16} />
-          </button>
+          <CloseX onClick={onClose} />
         </div>
         <div className="min-h-0 flex-1 overflow-auto p-4">{children}</div>
         {footer && <div className="flex items-center justify-end gap-2 border-t border-line bg-sunken/50 px-4 py-3">{footer}</div>}

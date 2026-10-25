@@ -13,6 +13,12 @@
   --added: 22 163 74;
   --changed: 202 138 4;
   --removed: 220 38 38;
+  --side: 253 253 255;
+  --r: 6px;
+  /* Close, cancel and discard buttons (Settings → Appearance). */
+  --close-fg: 185 28 28;
+  --close-line: 252 165 165;
+  --close-soft: 254 242 242;
   color-scheme: light;
 }
 
@@ -27,6 +33,10 @@
   --added: 74 222 128;
   --changed: 250 204 21;
   --removed: 248 113 113;
+  --side: 22 22 26;
+  --close-fg: 248 113 113;
+  --close-line: 127 29 29;
+  --close-soft: 60 14 14;
   color-scheme: dark;
 }
 
@@ -50,6 +60,29 @@ body {
 :focus-visible {
   outline: 2px solid rgb(var(--accent) / 0.6);
   outline-offset: 1px;
+}
+
+/* A: red text. B: red outline (default). C: soft red pill. */
+.cf-close {
+  color: rgb(var(--close-fg));
+  transition: background-color 0.12s, border-color 0.12s;
+}
+.cf-close:hover {
+  background-color: rgb(var(--close-soft));
+}
+:root[data-close="b"] .cf-close {
+  border: 1px solid rgb(var(--close-line));
+  background-color: rgb(var(--panel));
+}
+:root[data-close="b"] .cf-close:hover {
+  background-color: rgb(var(--close-soft));
+}
+:root[data-close="c"] .cf-close {
+  background-color: rgb(var(--close-soft));
+  border-radius: 9999px;
+}
+:root[data-close="c"] .cf-close:hover {
+  background-color: rgb(var(--close-line) / 0.45);
 }
 
 .kbd {

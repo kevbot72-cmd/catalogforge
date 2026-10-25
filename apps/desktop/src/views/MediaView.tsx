@@ -143,7 +143,7 @@ export function MediaView() {
         {selected.size > 0 && (
           <>
             <span className="text-muted" data-testid="media-selected-count">{selected.size.toLocaleString()} selected</span>
-            <Button size="sm" variant="ghost" icon={<X size={13} />} onClick={() => setSelected(new Set())}>Clear</Button>
+            <Button size="sm" variant="close" icon={<X size={13} />} onClick={() => setSelected(new Set())}>Clear</Button>
             <span className="flex-1" />
             <Button size="sm" variant="danger" icon={<Trash2 size={14} />} onClick={() => setConfirm(true)} data-testid="media-delete">Delete selected ({selected.size.toLocaleString()})</Button>
           </>
@@ -191,7 +191,7 @@ export function MediaView() {
         width={480}
         testId="media-delete-dialog"
         footer={<>
-          <Button onClick={() => setConfirm(false)}>Cancel</Button>
+          <Button variant="close" onClick={() => setConfirm(false)}>Cancel</Button>
           <Button variant="danger" icon={<Trash2 size={14} />} onClick={deleteSelected} data-testid="media-delete-confirm">Delete</Button>
         </>}
       >

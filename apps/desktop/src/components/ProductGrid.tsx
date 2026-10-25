@@ -4,29 +4,31 @@ import DataEditor, {
 import "@glideapps/glide-data-grid/dist/index.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { META_PREFIX, type CustomField, type Edit, type ProductRow } from "../backend/types";
+import { CHOICES, choiceLabel, YES_NO } from "../lib/fieldOptions";
+import { accentHex } from "../lib/theme";
 import { useApp } from "../store/app";
+import { CellDropdown, type CellDropdownState } from "./CellDropdown";
 import { mediaUrl } from "./ui";
 
 export interface ColumnDef {
   id: string;
   title: string;
   width: number;
-  kind: "text" | "price" | "int" | "bool" | "enum" | "image" | "tags" | "cats" | "expander" | "readonly" | "html";
+  kind: "text" | "price" | "int" | "bool" | "enum" | "image" | "tags" | "cats" | "readonly" | "html";
   options?: string[];
   editable?: boolean;
 }
 
 export const ALL_COLUMNS: ColumnDef[] = [
-  { id: "_expand", title: "", width: 28, kind: "expander" },
   { id: "image_id", title: "", width: 44, kind: "image" },
   { id: "name", title: "Name", width: 300, kind: "text", editable: true },
   { id: "sku", title: "SKU", width: 140, kind: "text", editable: true },
-  { id: "type", title: "Type", width: 84, kind: "readonly" },
-  { id: "status", title: "Status", width: 84, kind: "enum", options: ["publish", "draft", "pending", "private"], editable: true },
+  { id: "type", title: "Type", width: 96, kind: "enum", options: ["simple", "variable", "grouped", "external"], editable: true },
+  { id: "status", title: "Status", width: 110, kind: "enum", options: ["publish", "draft", "pending", "private"], editable: true },
   { id: "regular_price", title: "Price", width: 90, kind: "price", editable: true },
   { id: "sale_price", title: "Sale", width: 80, kind: "price", editable: true },
   { id: "stock_quantity", title: "Stock", width: 70, kind: "int", editable: true },
-  { id: "stock_status", title: "Stock status", width: 104, kind: "enum", options: ["instock", "outofstock", "onbackorder"], editable: true },
+  { id: "stock_status", title: "Stock status", width: 120, kind: "enum", options: ["instock", "outofstock", "onbackorder"], editable: true },
   { id: "manage_stock", title: "Manage", width: 70, kind: "bool", editable: true },
   { id: "category_ids", title: "Categories", width: 200, kind: "cats" },
   { id: "tags", title: "Tags", width: 150, kind: "tags", editable: true },
@@ -37,7 +39,7 @@ export const ALL_COLUMNS: ColumnDef[] = [
   { id: "shipping_class", title: "Shipping class", width: 120, kind: "text", editable: true },
   { id: "global_unique_id", title: "GTIN/EAN", width: 130, kind: "text", editable: true },
   { id: "featured", title: "Featured", width: 76, kind: "bool", editable: true },
-  { id: "catalog_visibility", title: "Visibility", width: 96, kind: "enum", options: ["visible", "catalog", "search", "hidden"], editable: true },
+  { id: "catalog_visibility", title: "Visibility", width: 130, kind: "enum", options: ["visible", "catalog", "search", "hidden"], editable: true },
   { id: "seo_title", title: "SEO title", width: 220, kind: "text", editable: true },
   { id: "seo_description", title: "SEO description", width: 280, kind: "text", editable: true },
   { id: "short_description", title: "Short description", width: 260, kind: "html" },
@@ -48,11 +50,11 @@ export const ALL_COLUMNS: ColumnDef[] = [
 ];
 
 export const VIEW_PRESETS: Record<string, string[]> = {
-  Default: ["_expand", "image_id", "name", "sku", "type", "status", "regular_price", "sale_price", "stock_quantity", "stock_status", "category_ids", "tags", "id"],
-  Pricing: ["_expand", "image_id", "name", "sku", "regular_price", "sale_price", "status", "category_ids"],
-  Inventory: ["_expand", "image_id", "name", "sku", "manage_stock", "stock_quantity", "stock_status", "global_unique_id"],
-  Shipping: ["_expand", "image_id", "name", "sku", "weight", "length", "width", "height", "shipping_class"],
-  SEO: ["_expand", "image_id", "name", "sku", "seo_title", "seo_description", "short_description", "catalog_visibility", "featured"],
+  Default: ["image_id", "name", "sku", "type", "status", "regular_price", "sale_price", "stock_quantity", "stock_status", "category_ids", "tags", "id"],
+  Pricing: ["image_id", "name", "sku", "regular_price", "sale_price", "status", "category_ids"],
+  Inventory: ["image_id", "name", "sku", "manage_stock", "stock_quantity", "stock_status", "global_unique_id"],
+  Shipping: ["image_id", "name", "sku", "weight", "length", "width", "height", "shipping_class"],
+  SEO: ["image_id", "name", "sku", "seo_title", "seo_description", "short_description", "catalog_visibility", "featured"],
 };
 
 /** Grid columns for the store's custom fields (plugin meta), editable like built-in fields. */
@@ -73,20 +75,34 @@ export function columnsFor(fields?: CustomField[]): ColumnDef[] {
 
 export function presetsFor(fields?: CustomField[]): Record<string, string[]> {
   if (!fields?.length) return VIEW_PRESETS;
-  return { ...VIEW_PRESETS, "Custom fields": ["_expand", "image_id", "name", "sku", ...fields.map((f) => META_PREFIX + f.key)] };
+  return { ...VIEW_PRESETS, "Custom fields": ["image_id", "name", "sku", ...fields.map((f) => META_PREFIX + f.key)] };
 }
 
 const PAGE = 200;
 
-function useGridTheme(dark: boolean): Partial<Theme> {
+function useGridTheme(dark: boolean, accent: string): Partial<Theme> {
   return useMemo(
-    () =>
-      dark
+    () => ({
+      ...(dark
         ? { accentColor: "#818cf8", accentLight: "rgba(129,140,248,0.18)", textDark: "#ececf0", textMedium: "#a1a1aa", textLight: "#71717a", bgCell: "#16161a", bgCellMedium: "#1c1c21", bgHeader: "#111114", bgHeaderHasFocus: "#1c1c21", bgHeaderHovered: "#1c1c21", borderColor: "#27272d", horizontalBorderColor: "#1f1f24", textHeader: "#a1a1aa", bgBubble: "#27272d", bgBubbleSelected: "#3f3f46", textBubble: "#d4d4d8", linkColor: "#818cf8", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif", baseFontStyle: "13px", headerFontStyle: "600 12px", editorFontSize: "13px" }
-        : { accentColor: "#4f46e5", accentLight: "rgba(79,70,229,0.10)", textDark: "#18181b", textMedium: "#52525b", textLight: "#a1a1aa", bgCell: "#ffffff", bgCellMedium: "#fafafa", bgHeader: "#fafafa", bgHeaderHasFocus: "#f4f4f5", bgHeaderHovered: "#f4f4f5", borderColor: "#e4e4e7", horizontalBorderColor: "#f0f0f2", textHeader: "#71717a", bgBubble: "#f4f4f5", bgBubbleSelected: "#e4e4e7", textBubble: "#3f3f46", linkColor: "#4f46e5", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif", baseFontStyle: "13px", headerFontStyle: "600 12px", editorFontSize: "13px" },
-    [dark],
+        : { accentColor: "#4f46e5", accentLight: "rgba(79,70,229,0.10)", textDark: "#18181b", textMedium: "#52525b", textLight: "#a1a1aa", bgCell: "#ffffff", bgCellMedium: "#fafafa", bgHeader: "#fafafa", bgHeaderHasFocus: "#f4f4f5", bgHeaderHovered: "#f4f4f5", borderColor: "#e4e4e7", horizontalBorderColor: "#f0f0f2", textHeader: "#71717a", bgBubble: "#f4f4f5", bgBubbleSelected: "#e4e4e7", textBubble: "#3f3f46", linkColor: "#4f46e5", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif", baseFontStyle: "13px", headerFontStyle: "600 12px", editorFontSize: "13px" }),
+      accentColor: accent,
+      accentLight: accent + (dark ? "2e" : "1a"),
+      linkColor: accent,
+    }),
+    [dark, accent],
   );
 }
+
+/** Columns whose cells open an options list instead of a text box. */
+function choicesFor(c: ColumnDef) {
+  if (c.kind === "bool") return YES_NO;
+  if (c.kind !== "enum") return null;
+  return CHOICES[c.id] ?? (c.options ?? []).map((v) => ({ value: v, label: choiceLabel(c.id, v) }));
+}
+
+/** Clicks this close to the left edge of a variable product's name toggle its variations. */
+const ARROW_HIT = 26;
 
 const DIFF = {
   light: { added: "#ecfdf3", changed: "#fef9c3", removed: "#fee2e2", conflict: "#fecaca" },
@@ -98,7 +114,8 @@ function plain(html: string) {
 }
 
 export function ProductGrid({ columns }: { columns: ColumnDef[] }) {
-  const { backend, storeId, query, version, media, taxonomy, dark, stage, setQuery, setSelection, openDrawer, toast } = useApp();
+  const { backend, storeId, query, version, media, taxonomy, dark, appearance, stage, setQuery, setSelection, openDrawer, toast, setFocusKey, setPanel, selection: picked } = useApp();
+  const [dropdown, setDropdown] = useState<CellDropdownState | null>(null);
   const ref = useRef<DataEditorRef>(null);
   const [keys, setKeys] = useState<string[]>([]);
   const rowsRef = useRef<Map<number, ProductRow>>(new Map());
@@ -114,7 +131,7 @@ export function ProductGrid({ columns }: { columns: ColumnDef[] }) {
   });
   const [selection, setGridSelection] = useState<GridSelection>({ columns: CompactSelection.empty(), rows: CompactSelection.empty() });
   const visible = useRef<Rectangle>({ x: 0, y: 0, width: 10, height: 50 });
-  const theme = useGridTheme(dark);
+  const theme = useGridTheme(dark, accentHex(appearance, dark));
   const diff = dark ? DIFF.dark : DIFF.light;
   const catNames = useMemo(() => new Map((taxonomy?.categories ?? []).map((c) => [String(c._state.is_new ? c._state.key : c.id), c.name])), [taxonomy]);
   const keysRef = useRef(keys);
@@ -201,17 +218,17 @@ export function ProductGrid({ columns }: { columns: ColumnDef[] }) {
       const value = (r as Record<string, unknown>)[c.id];
       const readonly = !c.editable || st.deleted || (isVar && ["tags", "featured", "catalog_visibility", "seo_title", "seo_description", "short_description", "status"].includes(c.id)) || (r.type === "variable" && ["regular_price", "sale_price", "stock_quantity"].includes(c.id) && !r.manage_stock && c.id !== "stock_quantity");
       switch (c.kind) {
-        case "expander": {
-          const expanded = query.expanded?.includes(st.key);
-          const d = r.type === "variable" ? (expanded ? "▾" : "▸") : "";
-          return { kind: GridCellKind.Text, data: d, displayData: d, allowOverlay: false, readonly: true, contentAlign: "center", themeOverride };
-        }
         case "image": {
           const url = mediaUrl(r.image_id, media);
           return { kind: GridCellKind.Image, data: url ? [url] : [], allowOverlay: false, readonly: true, themeOverride };
         }
         case "bool":
-          return { kind: GridCellKind.Boolean, data: !!value, allowOverlay: false, readonly, themeOverride };
+        case "enum": {
+          const raw = c.kind === "bool" ? (value ? "yes" : "no") : String(value ?? "");
+          const ro = readonly || (c.id === "type" && isVar);
+          const display = c.id === "type" && isVar ? "variation" : raw ? choiceLabel(c.id, c.kind === "bool" ? !!value : raw) : "";
+          return { kind: GridCellKind.Text, data: raw, displayData: display, allowOverlay: false, readonly: ro, themeOverride };
+        }
         case "cats": {
           const names = ((value as (number | string)[]) ?? []).map((id) => catNames.get(String(id)) ?? `#${id}`);
           return { kind: GridCellKind.Bubble, data: names, allowOverlay: true, themeOverride };
@@ -226,9 +243,11 @@ export function ProductGrid({ columns }: { columns: ColumnDef[] }) {
           let display = value === null || value === undefined ? "" : String(value);
           if (c.id === "name" && isVar) {
             const va = Object.values(r.variation_attributes ?? {}).join(" · ");
-            display = `   ↳ ${va || display}`;
+            display = `      ↳ ${va || display}`;
+          } else if (c.id === "name") {
+            // Variable products carry their expand arrow in front of the name.
+            display = r.type === "variable" ? `${query.expanded?.includes(st.key) ? "▾" : "▸"}  ${display}` : `    ${display}`;
           }
-          if (c.id === "type" && r.type === "variable") display = "variable";
           if (c.id === "date_modified_gmt" && display) display = display.replace("T", " ").replace("Z", "");
           if (c.id === "id" && st.is_new) display = "new";
           return {
@@ -256,7 +275,12 @@ export function ProductGrid({ columns }: { columns: ColumnDef[] }) {
       const key = r._state.key;
       let value: unknown;
       if (cell.kind === GridCellKind.Boolean) value = !!cell.data;
-      else {
+      else if (c.kind === "bool") {
+        const v = String((cell as { data?: unknown }).data ?? "").trim().toLowerCase();
+        if (["yes", "y", "true", "1", "on"].includes(v)) value = true;
+        else if (["no", "n", "false", "0", "off", ""].includes(v)) value = false;
+        else return `${c.title} must be yes or no`;
+      } else {
         const raw = String((cell as { data?: unknown }).data ?? "").trim();
         switch (c.kind) {
           case "price": {
@@ -279,7 +303,8 @@ export function ProductGrid({ columns }: { columns: ColumnDef[] }) {
           }
           case "enum": {
             const v = raw.toLowerCase().replace(/\s+/g, "");
-            const alias: Record<string, string> = { published: "publish", live: "publish", active: "publish", "in": "instock", out: "outofstock", backorder: "onbackorder", true: "yes", y: "yes", "1": "yes", false: "no", n: "no", "0": "no" };
+            const byLabel = choicesFor(c)?.find((x) => x.label.toLowerCase().replace(/\s+/g, "") === v)?.value;
+            const alias: Record<string, string> = { ...(byLabel ? { [v]: byLabel } : {}), published: "publish", live: "publish", active: "publish", "in": "instock", out: "outofstock", backorder: "onbackorder", true: "yes", y: "yes", "1": "yes", false: "no", n: "no", "0": "no" };
             const val = c.options?.includes(v) ? v : c.options?.includes(alias[v]) ? alias[v] : undefined;
             if (!val) return `${c.title} must be one of: ${c.options?.join(", ")}`;
             value = val;
@@ -322,8 +347,15 @@ export function ProductGrid({ columns }: { columns: ColumnDef[] }) {
     [stage, toEdit, toast],
   );
 
+  const lastClick = useRef<{ col: number; row: number; at: number } | null>(null);
+  const gridSelRef = useRef(selection);
+  gridSelRef.current = selection;
   const onSelection = useCallback(
-    (s: GridSelection) => {
+    (next: GridSelection) => {
+      // Glide drops the ticked rows on any plain cell click. Keep them: the ticks are what the edit
+      // panel and the cell dropdowns work on. Unticking, the header box or Esc still clear them.
+      const prev = gridSelRef.current;
+      const s = next.current && next.rows.length === 0 && prev.rows.length > 0 ? { ...next, rows: prev.rows } : next;
       setGridSelection(s);
       // Checked rows, or a multi-row range; a single focused cell is not a "selection".
       const rowsSel = s.rows.toArray();
@@ -331,8 +363,46 @@ export function ProductGrid({ columns }: { columns: ColumnDef[] }) {
       const fromRange = range && range.height > 1 ? Array.from({ length: range.height }, (_, i) => range.y + i) : [];
       const keysSel = (rowsSel.length ? rowsSel : fromRange).map((i) => keysRef.current[i]).filter(Boolean);
       setSelection(keysSel);
+      const focused = s.current?.cell[1];
+      if (focused !== undefined && keysRef.current[focused]) setFocusKey(keysRef.current[focused]);
     },
-    [setSelection],
+    [setSelection, setFocusKey],
+  );
+
+  /** Opens the options list for a list cell; with ticked rows, the choice goes to all of them. */
+  const openDropdown = useCallback(
+    (col: number, row: number, bounds?: Rectangle) => {
+      const c = columns[col];
+      const r = rowsRef.current.get(row);
+      const choices = c && choicesFor(c);
+      if (!r || !c || !choices || !c.editable) return false;
+      const cell = getCellContent([col, row]);
+      if ((cell as { readonly?: boolean }).readonly) return false;
+      const b = bounds ?? ref.current?.getBounds(col, row);
+      if (!b) return false;
+      const many = picked.length > 1 && picked.includes(r._state.key);
+      const loaded = [...rowsRef.current.values()];
+      setDropdown({
+        bounds: b,
+        title: c.title,
+        choices,
+        current: String((cell as { data?: unknown }).data ?? ""),
+        count: many ? picked.length : 1,
+        onPick: (v) => {
+          const value = c.kind === "bool" ? v === "yes" : v;
+          const edits: Edit[] = [];
+          for (const key of many ? picked : [r._state.key]) {
+            // Rows far off-screen aren't loaded; they are products unless the key says otherwise.
+            const x = loaded.find((y) => y._state.key === key);
+            if (x?._state.deleted || (c.id === "type" && x?.type === "variation")) continue;
+            edits.push({ entity: x?.type === "variation" ? "variation" : "product", key, field: c.id, value });
+          }
+          stage(edits).catch((e) => toast({ tone: "error", title: "Could not stage edit", body: String(e) }));
+        },
+      });
+      return true;
+    },
+    [columns, getCellContent, picked, stage, toast],
   );
 
   return (
@@ -347,10 +417,14 @@ export function ProductGrid({ columns }: { columns: ColumnDef[] }) {
         onPaste
         fillHandle
         rowMarkers="checkbox-visible"
+        // Tick boxes add to the selection without Ctrl, and clicking a cell keeps the ticks
+        // (the edit panel and the cell dropdowns work on the ticked rows).
+        rowSelectionMode="multi"
+        rowSelectionBlending="mixed"
         smoothScrollX
         smoothScrollY
         freezeColumns={3}
-        rowHeight={36}
+        rowHeight={appearance.density === "compact" ? 30 : 36}
         headerHeight={34}
         width="100%"
         height="100%"
@@ -370,29 +444,53 @@ export function ProductGrid({ columns }: { columns: ColumnDef[] }) {
         }}
         onHeaderClicked={(col) => {
           const c = columns[col];
-          if (["_expand", "image_id", "cats", "category_ids"].includes(c.id) || c.kind === "html") return;
+          if (["image_id", "cats", "category_ids"].includes(c.id) || c.kind === "html") return;
           const cur = query.sort?.[0];
           setQuery({ sort: [{ field: c.id, desc: cur?.field === c.id ? !cur.desc : c.kind === "price" || c.kind === "int" }] });
         }}
-        onCellClicked={([col, row]) => {
+        drawCell={(args, draw) => {
+          draw();
+          const c = columns[args.col];
+          if (!c || !choicesFor(c) || (args.cell as { readonly?: boolean }).readonly) return;
+          // A small ▾ marks cells that open an options list.
+          const { ctx, rect, theme: t } = args;
+          ctx.save();
+          ctx.fillStyle = t.textLight;
+          ctx.font = `10px ${t.fontFamily}`;
+          ctx.textAlign = "right";
+          ctx.textBaseline = "middle";
+          ctx.fillText("▾", rect.x + rect.width - 8, rect.y + rect.height / 2 + 1);
+          ctx.restore();
+        }}
+        onCellClicked={([col, row], e) => {
+          // Glide flags any quick second click as a double-click, even on another cell.
+          const last = lastClick.current;
+          const double = !!last && last.col === col && last.row === row && Date.now() - last.at < 450;
+          lastClick.current = { col, row, at: Date.now() };
           const c = columns[col];
           const r = rowsRef.current.get(row);
           // The row tick boxes report col -1.
           if (!r || !c) return;
-          if (c.id === "_expand" && r.type === "variable") {
+          if (c.id === "name" && r.type === "variable" && e.localEventX < ARROW_HIT) {
             const exp = new Set(query.expanded ?? []);
             if (exp.has(r._state.key)) exp.delete(r._state.key);
             else exp.add(r._state.key);
             setQuery({ expanded: [...exp] });
+            return;
           }
           if (c.id === "image_id") openDrawer(r.type === "variation" ? String(r.parent_id) : r._state.key);
+          else if (!e.shiftKey && !e.ctrlKey && !e.metaKey && !double) openDropdown(col, row, e.bounds);
         }}
         onCellActivated={([col, row]) => {
           const c = columns[col];
           const r = rowsRef.current.get(row);
           // The row tick boxes report col -1.
           if (!r || !c) return;
-          if (c.kind === "cats" || c.kind === "html" || c.kind === "image" || c.id === "type" || c.id === "id") openDrawer(r.type === "variation" ? String(r.parent_id) : r._state.key);
+          if (openDropdown(col, row)) return;
+          if (c.kind === "image") openDrawer(r.type === "variation" ? String(r.parent_id) : r._state.key);
+          // Categories and descriptions open in the edit panel, on the matching section.
+          else if (c.kind === "cats") setPanel({ open: true, section: "categories" });
+          else if (c.kind === "html") setPanel({ open: true, section: "content" });
         }}
         getRowThemeOverride={(row) => {
           const r = rowsRef.current.get(row);
@@ -402,6 +500,7 @@ export function ProductGrid({ columns }: { columns: ColumnDef[] }) {
           return undefined;
         }}
       />
+      {dropdown && <CellDropdown state={dropdown} onClose={() => setDropdown(null)} />}
     </div>
   );
 }

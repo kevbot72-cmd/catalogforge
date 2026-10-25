@@ -1,8 +1,8 @@
-import { AlertTriangle, ArrowRight, RotateCcw, X } from "lucide-react";
+import { AlertTriangle, ArrowRight, RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { StagedChange } from "../backend/types";
 import { fieldLabel, useApp } from "../store/app";
-import { Badge, Button, clsx, formatValue } from "./ui";
+import { Badge, Button, CloseX, clsx, formatValue } from "./ui";
 
 export function ChangesPanel() {
   const { backend, storeId, version, changesOpen, toggleChanges, summary, push, discardAll, openDrawer, busy, taxonomy } = useApp();
@@ -46,7 +46,7 @@ export function ChangesPanel() {
         {summary.modified > 0 && <Badge tone="changed">{summary.modified} edited</Badge>}
         {summary.deleted > 0 && <Badge tone="removed">−{summary.deleted}</Badge>}
         <span className="flex-1" />
-        <button onClick={() => toggleChanges(false)} className="rounded p-1 text-muted hover:bg-sunken" aria-label="Close changes"><X size={15} /></button>
+        <CloseX onClick={() => toggleChanges(false)} label="Close changes" />
       </div>
       <div className="min-h-0 flex-1 overflow-auto">
         {groups.length === 0 && <div className="p-6 text-center text-muted">Nothing to push. Edits you make anywhere appear here as a reviewable diff before anything touches your store.</div>}
@@ -90,7 +90,7 @@ export function ChangesPanel() {
       <div className="space-y-2 border-t border-line p-3">
         <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Describe this change (optional)" className="h-8 w-full rounded-md border border-line bg-panel px-2 text-[13px] focus:outline-none" />
         <div className="flex gap-2">
-          <Button variant="ghost" size="sm" onClick={discardAll} disabled={!groups.length || !!busy}>Discard all</Button>
+          <Button variant="close" size="sm" onClick={discardAll} disabled={!groups.length || !!busy}>Discard all</Button>
           <span className="flex-1" />
           <Button variant="primary" onClick={() => push(label).then(() => setLabel(""))} disabled={!groups.length || !!busy} data-testid="push-panel">
             Push {summary.created + summary.modified + summary.deleted} changes

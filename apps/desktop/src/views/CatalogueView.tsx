@@ -478,7 +478,7 @@ export function CatalogueView() {
                 {design.templateFile && (
                   <>
                     <span className="min-w-0 flex-1 truncate text-xs">{design.templateFile.name}{tpl && ` · ${tpl.pages} pages`}</span>
-                    <Button size="sm" variant="ghost" icon={<X size={13} />} onClick={() => setDesign({ templateFile: null })}>Remove</Button>
+                    <Button size="sm" variant="close" icon={<X size={13} />} onClick={() => setDesign({ templateFile: null })}>Remove</Button>
                   </>
                 )}
               </div>
@@ -532,7 +532,7 @@ export function CatalogueView() {
           <Button size="sm" variant="primary" icon={exporting ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />} disabled={!plan || !!exporting || plan.productCount === 0} onClick={exportPdf} data-testid="catalogue-export">
             {exporting ? `${exporting.message}${exporting.total > 1 ? ` ${Math.round((exporting.done / exporting.total) * 100)}%` : ""}` : "Create PDF…"}
           </Button>
-          {exporting && <Button size="sm" variant="ghost" onClick={() => abort.current?.abort()}>Cancel</Button>}
+          {exporting && <Button size="sm" variant="close" onClick={() => abort.current?.abort()}>Cancel</Button>}
         </div>
         <div className="min-h-0 flex-1 overflow-auto">
           {plan && plan.productCount === 0 ? (
@@ -550,7 +550,7 @@ function FilePickButton({ label, file, onPick, onClear }: { label: string; file:
   return file ? (
     <span className="flex h-8 items-center gap-1 rounded-md border border-line px-2 text-xs">
       <ImagePlus size={13} className="text-muted" /><span className="max-w-[110px] truncate">{file.name}</span>
-      <button onClick={onClear} className="text-muted hover:text-removed" aria-label={`Remove ${label}`}><X size={12} /></button>
+      <button onClick={onClear} className="cf-close rounded p-0.5" aria-label={`Remove ${label}`}><X size={12} /></button>
     </span>
   ) : (
     <Button size="sm" icon={<ImagePlus size={13} />} onClick={onPick}>{label}…</Button>
@@ -569,7 +569,7 @@ function TextBlocks({ title, texts, onChange, fonts, addFont, hint, testId }: { 
               <label className="flex items-center gap-1.5 text-2xs text-muted">Position {Math.round(t.y)}%
                 <input type="range" min={0} max={97} value={t.y} onChange={(e) => update(i, { y: Number(e.target.value) })} className="w-24" aria-label={`${t.label} position`} />
               </label>
-              <button onClick={() => onChange(texts.filter((_, j) => j !== i))} className="text-muted hover:text-removed" aria-label={`Remove ${t.label}`}><Trash2 size={13} /></button>
+              <button onClick={() => onChange(texts.filter((_, j) => j !== i))} className="cf-close rounded p-0.5" aria-label={`Remove ${t.label}`}><Trash2 size={13} /></button>
             </div>
             <TextArea value={t.text} rows={Math.min(4, t.text.split("\n").length + 1)} onChange={(e) => update(i, { text: e.target.value })} data-testid={`${testId ?? "texts"}-${t.id}`} />
             <TextStyleEditor value={t.style} onChange={(s) => update(i, { style: s })} fonts={fonts} onAddFont={addFont} />

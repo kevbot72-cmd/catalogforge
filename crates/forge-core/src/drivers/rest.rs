@@ -25,6 +25,10 @@ pub struct RestDriver {
     custom: super::MetaKeys,
 }
 
+fn ids(v: &Value) -> Vec<i64> {
+    v.as_array().map(|a| a.iter().filter_map(|x| x.as_i64()).collect()).unwrap_or_default()
+}
+
 fn s(v: &Value) -> String {
     match v {
         Value::String(s) => s.clone(),
@@ -205,6 +209,12 @@ impl RestDriver {
             catalog_visibility: if is_var { "visible".into() } else { s(&v["catalog_visibility"]) },
             is_virtual: v["virtual"].as_bool().unwrap_or(false),
             downloadable: v["downloadable"].as_bool().unwrap_or(false),
+            sold_individually: v["sold_individually"].as_bool().unwrap_or(false),
+            reviews_allowed: v["reviews_allowed"].as_bool().unwrap_or(!is_var),
+            purchase_note: s(&v["purchase_note"]),
+            upsell_ids: ids(&v["upsell_ids"]),
+            cross_sell_ids: ids(&v["cross_sell_ids"]),
+            brand_ids: v["brands"].as_array().map(|a| a.iter().filter_map(|b| b["id"].as_i64().or_else(|| b.as_i64())).collect()).unwrap_or_default(),
             category_ids: v["categories"].as_array().map(|a| a.iter().filter_map(|c| c["id"].as_i64()).collect()).unwrap_or_default(),
             tags: v["tags"].as_array().map(|a| a.iter().map(|t| s(&t["name"])).collect()).unwrap_or_default(),
             attributes,
@@ -239,8 +249,15 @@ impl RestDriver {
             match k.as_str() {
                 "name" | "slug" | "status" | "sku" | "global_unique_id" | "regular_price" | "sale_price" | "manage_stock" | "stock_quantity" | "stock_status"
                 | "backorders" | "weight" | "shipping_class" | "tax_status" | "tax_class" | "description" | "short_description" | "menu_order" | "featured"
-                | "catalog_visibility" | "virtual" | "downloadable" | "external_url" | "button_text" | "type" => {
+                | "catalog_visibility" | "virtual" | "downloadable" | "external_url" | "button_text" | "type" | "sold_individually" | "reviews_allowed"
+                | "purchase_note" => {
                     out.insert(k.clone(), v.clone());
+                }
+                "upsell_ids" | "cross_sell_ids" => {
+                    out.insert(k.clone(), Value::Array(v.as_array().into_iter().flatten().filter_map(resolve).map(|id| json!(id)).collect()));
+                }
+                "brand_ids" => {
+                    out.insert("brands".into(), Value::Array(v.as_array().into_iter().flatten().filter_map(resolve).map(|id| json!(id)).collect()));
                 }
                 "date_on_sale_from" => {
                     out.insert("date_on_sale_from_gmt".into(), v.as_str().map(|d| json!(d.trim_end_matches('Z'))).unwrap_or(Value::Null));
@@ -478,6 +495,10 @@ impl Driver for RestDriver {
             });
         }
         tax.tags = tags.iter().map(|t| Tag { id: t["id"].as_i64().unwrap_or(0), name: s(&t["name"]), slug: s(&t["slug"]), count: t["count"].as_i64().unwrap_or(0) }).collect();
+        // Brands are core in WooCommerce 9.6+; older stores simply have none.
+        if let Ok(brands) = self.get_all("/products/brands", &[]).await {
+            tax.brands = brands.iter().map(|t| Tag { id: t["id"].as_i64().unwrap_or(0), name: s(&t["name"]), slug: s(&t["slug"]), count: t["count"].as_i64().unwrap_or(0) }).collect();
+        }
         tax.shipping_classes = ship.iter().map(|t| Term { id: t["id"].as_i64().unwrap_or(0), name: s(&t["name"]), slug: s(&t["slug"]) }).collect();
         for a in attrs {
             let id = a["id"].as_i64().unwrap_or(0);

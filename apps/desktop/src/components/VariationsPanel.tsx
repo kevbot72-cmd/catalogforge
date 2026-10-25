@@ -73,7 +73,7 @@ export function VariationsPanel({ parent }: { parent: ProductRow }) {
                     <td className="px-1 py-1"><BufferedInput className={clsx("h-7", v._state.dirty.includes("regular_price") && "border-changed")} value={v.regular_price} onCommit={(x) => setVar(v, "regular_price", x === "" ? "" : Number(x).toFixed(2))} /></td>
                     <td className="px-1 py-1"><BufferedInput className={clsx("h-7", v._state.dirty.includes("sale_price") && "border-changed")} value={v.sale_price} onCommit={(x) => setVar(v, "sale_price", x === "" ? "" : Number(x).toFixed(2))} /></td>
                     <td className="px-1 py-1"><BufferedInput className={clsx("h-7", v._state.dirty.includes("stock_quantity") && "border-changed")} value={v.stock_quantity === null ? "" : String(v.stock_quantity)} onCommit={(x) => stage([{ entity: "variation", key: v._state.key, field: "stock_quantity", value: x === "" ? null : Math.trunc(Number(x)) }, { entity: "variation", key: v._state.key, field: "manage_stock", value: true }])} /></td>
-                    <td className="px-1"><button className="text-muted hover:text-removed" aria-label="Delete variation" onClick={() => remove("variation", [v._state.key])}><Trash2 size={14} /></button></td>
+                    <td className="px-1"><button className="cf-close rounded p-0.5" aria-label="Delete variation" onClick={() => remove("variation", [v._state.key])}><Trash2 size={14} /></button></td>
                   </tr>
                 ))}
               </tbody>
@@ -150,7 +150,7 @@ function MatrixGenerator({ parent, existing, onDone }: { parent: ProductRow; exi
           <div className="flex-1">
             <TagInput value={a.options} onChange={(options) => setAttrs(attrs.map((x, j) => (j === i ? { ...x, options } : x)))} suggestions={(taxonomy?.attributes.find((t) => t.taxonomy === a.taxonomy)?.terms ?? []).map((t) => t.name)} placeholder="Type values, press Enter" label={`${a.name} values`} />
           </div>
-          <button className="pt-1.5 text-muted hover:text-removed" onClick={() => setAttrs(attrs.filter((_, j) => j !== i))} aria-label="Remove"><Trash2 size={14} /></button>
+          <button className="cf-close mt-1 rounded p-0.5" onClick={() => setAttrs(attrs.filter((_, j) => j !== i))} aria-label="Remove"><Trash2 size={14} /></button>
         </div>
       ))}
       <div className="flex flex-wrap gap-2">
@@ -188,7 +188,7 @@ function MatrixGenerator({ parent, existing, onDone }: { parent: ProductRow; exi
       )}
       <div className="flex items-center justify-end gap-2">
         <span className="text-xs text-muted">{combos.length} combinations · {toCreate.length} new</span>
-        <Button size="sm" onClick={onDone}>Cancel</Button>
+        <Button size="sm" variant="close" onClick={onDone}>Cancel</Button>
         <Button size="sm" variant="primary" disabled={!toCreate.length} onClick={generate} data-testid="matrix-create">Create {toCreate.length} variations</Button>
       </div>
     </div>

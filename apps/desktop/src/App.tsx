@@ -63,7 +63,7 @@ function TopBar() {
 function Toasts() {
   const { toasts, dismissToast } = useApp();
   return (
-    <div className="pointer-events-none fixed bottom-4 left-1/2 z-[200] flex -translate-x-1/2 flex-col items-center gap-2">
+    <div className="pointer-events-none fixed left-1/2 top-14 z-[200] flex -translate-x-1/2 flex-col items-center gap-2">
       {toasts.map((t) => (
         <div key={t.id} role="status" className={clsx("pointer-events-auto flex max-w-xl items-start gap-2 rounded-lg border bg-panel px-3 py-2 shadow-xl", t.tone === "error" ? "border-removed/40" : "border-line")} data-testid="toast">
           {t.tone === "success" ? <CheckCircle2 size={16} className="mt-0.5 text-added" /> : t.tone === "error" ? <AlertCircle size={16} className="mt-0.5 text-removed" /> : <Info size={16} className="mt-0.5 text-accent" />}
@@ -71,7 +71,7 @@ function Toasts() {
             <div className="text-[13px] font-medium">{t.title}</div>
             {t.body && <div className="text-xs text-muted">{t.body}</div>}
           </div>
-          <button onClick={() => dismissToast(t.id)} className="text-muted" aria-label="Dismiss"><X size={14} /></button>
+          <button onClick={() => dismissToast(t.id)} className="cf-close rounded p-0.5" aria-label="Dismiss"><X size={14} /></button>
         </div>
       ))}
     </div>
@@ -79,18 +79,19 @@ function Toasts() {
 }
 
 export function App() {
-  const { view, storeId, drawerKey, stores, openDialog, init, setDark } = useApp();
+  const { view, storeId, drawerKey, stores, openDialog, init, setAppearance, appearance } = useApp();
   useEffect(() => {
-    let dark = window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
-    try {
-      const saved = localStorage.getItem("cf.dark");
-      if (saved !== null) dark = saved === "1";
-    } catch {
-      /* ignore */
-    }
-    setDark(dark);
+    setAppearance({});
     init();
-  }, [init, setDark]);
+  }, [init, setAppearance]);
+  // "Match computer" follows the system setting live.
+  useEffect(() => {
+    if (appearance.mode !== "system") return;
+    const mq = window.matchMedia?.("(prefers-color-scheme: dark)");
+    const h = () => setAppearance({});
+    mq?.addEventListener("change", h);
+    return () => mq?.removeEventListener("change", h);
+  }, [appearance.mode, setAppearance]);
 
   return (
     <div className="flex h-full">

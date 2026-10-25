@@ -274,6 +274,7 @@ impl Cache {
         }
         tx.execute("INSERT OR REPLACE INTO kv (key, value) VALUES ('shipping_classes', ?1)", [serde_json::to_string(&tax.shipping_classes)?])?;
         tx.execute("INSERT OR REPLACE INTO kv (key, value) VALUES ('tax_classes', ?1)", [serde_json::to_string(&tax.tax_classes)?])?;
+        tx.execute("INSERT OR REPLACE INTO kv (key, value) VALUES ('brands', ?1)", [serde_json::to_string(&tax.brands)?])?;
         tx.commit()?;
         self.upsert_media(&tax.media)
     }
@@ -629,6 +630,7 @@ impl Cache {
             backorders: "no".into(),
             tax_status: "taxable".into(),
             catalog_visibility: "visible".into(),
+            reviews_allowed: true,
             ..Default::default()
         })
         .unwrap_or_else(|_| json!({}))

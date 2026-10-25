@@ -20,7 +20,7 @@ export function PushConfirmDialog() {
       width={460}
       testId="push-confirm"
       footer={<>
-        <Button onClick={close} data-testid="push-confirm-no" autoFocus>No, go back</Button>
+        <Button variant="close" onClick={close} data-testid="push-confirm-no" autoFocus>No, go back</Button>
         <Button variant={live ? "danger" : "primary"} icon={<Upload size={14} />} onClick={yes} data-testid="push-confirm-yes">Yes, push</Button>
       </>}
     >

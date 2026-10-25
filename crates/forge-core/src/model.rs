@@ -40,6 +40,15 @@ pub struct Product {
     #[serde(rename = "virtual")]
     pub is_virtual: bool,
     pub downloadable: bool,
+    pub sold_individually: bool,
+    /// Missing in caches written before 0.5.0; WooCommerce's default is on.
+    #[serde(default = "yes")]
+    pub reviews_allowed: bool,
+    pub purchase_note: String,
+    pub upsell_ids: Vec<i64>,
+    pub cross_sell_ids: Vec<i64>,
+    /// `product_brand` terms (WooCommerce 9.6+ Brands).
+    pub brand_ids: Vec<i64>,
     pub category_ids: Vec<i64>,
     pub tags: Vec<String>,
     pub attributes: Vec<ProductAttribute>,
@@ -141,6 +150,11 @@ pub struct Taxonomy {
     pub shipping_classes: Vec<Term>,
     pub tax_classes: Vec<String>,
     pub media: Vec<Media>,
+    pub brands: Vec<Tag>,
+}
+
+fn yes() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]

@@ -102,7 +102,7 @@ export function MassChangeDialog() {
     <Modal open={open} onClose={() => openDialog(null)} title="Bulk edit" width={860} testId="mass-change"
       footer={<>
         <span className="mr-auto text-xs text-muted">{loading ? "Loading products…" : `${rows.length.toLocaleString()} in scope · ${changes.length.toLocaleString()} will change${skipped ? ` · ${skipped} not applicable` : ""}`}</span>
-        <Button onClick={() => openDialog(null)}>Cancel</Button>
+        <Button variant="close" onClick={() => openDialog(null)}>Cancel</Button>
         <Button variant="primary" disabled={!changes.length || !!error} onClick={apply} data-testid="mass-apply">Apply to {changes.length.toLocaleString()} products</Button>
       </>}>
       <div className="grid grid-cols-[1fr_1fr_1.4fr] gap-3">

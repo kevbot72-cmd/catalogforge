@@ -77,13 +77,15 @@ interface StoreData {
   lastPull: number | null;
 }
 
+const BRANDS = ["Northwind", "Fabrikam", "Contoso"];
+
 function blankProduct(id: number): Product {
   return {
     id, parent_id: 0, type: "simple", status: "publish", name: "", slug: "", sku: "", global_unique_id: "", regular_price: "", sale_price: "",
     date_on_sale_from: null, date_on_sale_to: null, manage_stock: false, stock_quantity: null, stock_status: "instock", backorders: "no",
     weight: "", length: "", width: "", height: "", shipping_class: "", tax_status: "taxable", tax_class: "", description: "", short_description: "",
-    menu_order: 0, featured: false, catalog_visibility: "visible", virtual: false, downloadable: false, category_ids: [], tags: [], attributes: [],
-    variation_attributes: {}, image_id: 0, gallery_ids: [], external_url: "", button_text: "", permalink: "", seo_title: "", seo_description: "",
+    menu_order: 0, featured: false, catalog_visibility: "visible", virtual: false, downloadable: false, sold_individually: false, reviews_allowed: true, purchase_note: "", upsell_ids: [], cross_sell_ids: [], brand_ids: [],
+    category_ids: [], tags: [], attributes: [], variation_attributes: {}, image_id: 0, gallery_ids: [], external_url: "", button_text: "", permalink: "", seo_title: "", seo_description: "",
     focus_keyword: "", date_created_gmt: null, date_modified_gmt: null,
   };
 }
@@ -543,6 +545,7 @@ export function createDemoBackend(): Backend {
         ],
         shipping_classes: [{ id: 1, name: "Bulky", slug: "bulky" }, { id: 2, name: "Letter", slug: "letter" }],
         tax_classes: ["reduced-rate", "zero-rate"],
+        brands: BRANDS.map((name, i) => ({ id: 900 + i, name, slug: name.toLowerCase(), count: 0 })),
       };
     },
     async media(id) {

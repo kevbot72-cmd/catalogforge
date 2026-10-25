@@ -247,6 +247,12 @@ class CF_Api {
 		foreach ( get_terms( array( 'taxonomy' => 'product_shipping_class', 'hide_empty' => false ) ) as $t ) {
 			$shipping[] = array( 'id' => $t->term_id, 'name' => $t->name, 'slug' => $t->slug );
 		}
+		$brands = array();
+		if ( taxonomy_exists( 'product_brand' ) ) {
+			foreach ( get_terms( array( 'taxonomy' => 'product_brand', 'hide_empty' => false ) ) as $t ) {
+				$brands[] = array( 'id' => $t->term_id, 'name' => $t->name, 'slug' => $t->slug, 'count' => (int) $t->count );
+			}
+		}
 		$media_ids = array();
 		foreach ( $cats as $c ) {
 			foreach ( array( 'image_id', 'banner_id' ) as $k ) {
@@ -267,6 +273,7 @@ class CF_Api {
 			'tags'             => $tags,
 			'attributes'       => $attrs,
 			'shipping_classes' => $shipping,
+			'brands'           => $brands,
 			'tax_classes'      => WC_Tax::get_tax_class_slugs(),
 			'media'            => $media,
 		);

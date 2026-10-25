@@ -5,7 +5,7 @@
 Tested against WordPress 6.8.3 + WooCommerce 9.9.5 on MariaDB (PHP built-in server):
 
 - **Plugin smoke test (40 checks):** signing, replay protection, a variable product with global attributes plus categories created through references in one batch, idempotent SKU matching, conflict detection, media upload with client-made sizes and deduplication, category and media updates, export, preview (existing and unsaved products, coming-soon mode), delete.
-- **Engine integration tests (8):**
+- **Engine integration tests (9):**
   - the full cycle: pull → stage → push with images → conflict → resolve → revert from history → delta pull with remote deletion → category filter → preview;
   - the MySQL reader matching the plugin field-for-field on 1,000 products and every category;
   - the Local adapter auto-provisioning (re-activating the plugin and creating a key) and writing media directly to disk;
@@ -13,10 +13,11 @@ Tested against WordPress 6.8.3 + WooCommerce 9.9.5 on MariaDB (PHP built-in serv
   - custom fields: discovery over the connector and MySQL, reading, editing, pushing and conflict detection;
   - media deletion: the attachment is removed on the store and from the cache, and the product loses the image;
   - formatted descriptions (lists, bold, colour, size) are stored by WooCommerce exactly as pushed;
-  - migration of a whole store (10,663 products) into a second, empty WooCommerce store, verified product by product, with a second run creating nothing.
-- **Unit tests:** 30 engine (cache, staging and undo, history, PHP serialization, signing, Local discovery, WordPress resize geometry, WebP pipeline, clone mapping) and 16 UI logic (formula engine, import planner, bulk edits).
+  - migration of a whole store (11,742 products) into a second, empty WooCommerce store, verified product by product, with a second run creating nothing;
+  - up-sells, cross-sells, brands, purchase note, "limit one per order" and reviews pushed and read back identically through the connector and direct MySQL.
+- **Unit tests:** 30 engine (cache, staging and undo, history, PHP serialization, signing, Local discovery, WordPress resize geometry, WebP pipeline, clone mapping) and 51 UI logic (formula engine, import planner, bulk edits, edit-panel mixed values and quick maths).
 - **Catalogue tests:** planning (exclusions at every level, pagination, contents page numbers, continuous flow and divider pages), text wrapping, and full PDF renders of every layout with a template, links, QR codes and bookmarks.
-- **UI end-to-end (27 steps):** grid edit and paste, undo, palette, drawer and live preview, paste cleanup, bulk edit, import with validation, variation matrix, diff panel, push, history revert, category drag-nesting, Local discovery, export, custom fields, new-product tabs, catalogue (leave out a category, change layout, cover and header text, load a template PDF, create the full PDF), category tick boxes for selected products (sub-category only, with parents, untick a parent), media range select, select all, delete with undo, pasting Google Docs text into bulk edit, push confirmation (No keeps changes staged, Yes pushes), Batch Builder (images matched and swapped, CSV export, batch added to the store, numbering continues), products in a category with tick boxes (sub-category products, tick, untick, add from the store), migration into an empty store (pre-flight, prepare, push, verify, re-run skips everything), dark mode.
+- **UI end-to-end (30 steps):** grid edit and paste, undo, palette, drawer and live preview, paste cleanup, bulk edit, import with validation, variation matrix, diff panel, push, history revert, category drag-nesting, Local discovery, export, custom fields, new-product tabs, catalogue (leave out a category, change layout, cover and header text, load a template PDF, create the full PDF), category tick boxes for selected products (sub-category only, with parents, untick a parent), media range select, select all, delete with undo, pasting Google Docs text into bulk edit, push confirmation (No keeps changes staged, Yes pushes), Batch Builder (images matched and swapped, CSV export, batch added to the store, numbering continues), products in a category with tick boxes (sub-category products, tick, untick, add from the store), migration into an empty store (pre-flight, prepare, push, verify, re-run skips everything), grid dropdown cells (keyboard choice, apply to all ticked rows), the ▸ in front of a variable product's name, the edit panel (tick three products, Mixed values, +10% on all, stock status, add a tag to all, discard), docking it on the right, folding and Ctrl+E, the version badge, themes and close-button styles, dark mode.
 - **Real desktop app (Tauri on Linux):** loaded 6,695 products from the test store through the connector; switched to a Local site (MySQL pull and auto-provisioning); edited in the grid; pushed with ⌘S (verified in the database); live preview inside the app.
 
 Measured on the test machine (PHP built-in server, untuned MariaDB, so real hosting will differ):
@@ -26,6 +27,27 @@ Measured on the test machine (PHP built-in server, untuned MariaDB, so real host
 | Create via connector (full WooCommerce save path, 2,000 products) | ~50 products/s (was ~25/s before the writer optimisations) |
 | Pull via connector | ~740 products/s |
 | Pull via direct MySQL / Local | ~5,800 products/s (6,695 products in 1.2 s) |
+
+## New in 0.5.0
+
+- **Edit panel** under the products grid (or docked on the right with one click), modelled on Store Manager's lower panel but built for editing many products at once:
+  - Tick any number of products and edit them all; with nothing ticked it shows the row you clicked. Clicking a product's picture still opens the full editor.
+  - Sections: Content, General, Inventory, Shipping, Linked products, Attributes, Advanced, Categories, Product tags, Gallery, Custom fields, SEO and Brands. A dot marks sections with staged changes.
+  - The header has the product type, Virtual, Downloadable and Featured (a dash means only some of the ticked products have it), the number of staged changes, **Discard**, and **Full editor**.
+  - Where the ticked products differ, a field says **Mixed** with the range (for example "80.49 – 100.49"); hover to see each value. Typing a value sets it on all of them.
+  - Price, stock, weight and number fields accept quick maths: `+10%`, `-5%`, `+20`, `-5`, `*1.2` or a formula like `=regular_price*0.8`. While you type, it shows the result (one product) or how many products change.
+  - Categories, tags, brands, up-sells, cross-sells and attributes show "2 of 3" for items only some products have; tick, add or remove for all of them at once.
+  - **Find a field** searches every section; **Only show fields that differ** lists just the mixed ones. Each field has its own undo.
+  - Drag the top edge to resize, double-click it or press **Ctrl+E** to fold it to a slim bar. Height, dock side and open section are remembered.
+- **New product fields**, read and written through the connector (plugin 0.3.0), the REST API and direct MySQL: up-sells, cross-sells, brands (WooCommerce 9.6+), purchase note, "limit one per order" and reviews on/off. Stores synced with an older version re-download once on the next Sync to pick these up.
+- **Grid:**
+  - Status, Stock status, Visibility, Type, Manage stock, Featured and yes/no custom fields open a list right in the cell: one click opens it; click a choice or use the arrow keys and Enter (type a letter to jump). With several rows ticked, the choice goes to all of them.
+  - The empty first column is gone; variable products have ▸ in front of the name (click it to show the variations).
+  - Ticking rows no longer needs Ctrl, and clicking a cell keeps your ticks (untick, use the header box, or press Esc to clear them).
+  - Double-clicking the categories or a description cell opens that section of the edit panel.
+- **Close, cancel and discard buttons are red** everywhere (✕ on windows and panels, Cancel, Clear, Discard, Delete, No), so they're easy to find on a busy page. Three styles in Settings: red text, red outline (default) or soft red pill.
+- **Settings → Appearance:** six themes (Indigo by default, Ocean, Forest, Plum, Copper, Graphite) plus your own colour; Light, Dark or Match computer; close-button style; Comfortable or Compact rows; Square, Soft or Round corners; Small, Normal or Large text. **Reset to theme** undoes the rest.
+- **Version badge** next to CatalogForge in the sidebar; click it to open Settings.
 
 ## New in 0.4.0
 
@@ -96,7 +118,7 @@ Measured on the test machine (PHP built-in server, untuned MariaDB, so real host
 
 ## Next
 
-0. **Migration, next steps**: up-sells, cross-sells and grouped products; customers and orders (with the connector on both stores); pages and menus.
+0. **Migration, next steps**: up-sells, cross-sells and brands (mapped by SKU), grouped products; customers and orders (with the connector on both stores); pages and menus.
 
 1. **SSH tunnel and SFTP drivers**: direct MySQL over SSH, and SFTP media upload for hosts that block HTTP uploads.
 2. **Scheduled supplier feeds**: saved import profiles run on a schedule from SFTP/HTTP/FTP, with a dry-run report before staging.

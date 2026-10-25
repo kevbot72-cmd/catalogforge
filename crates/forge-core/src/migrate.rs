@@ -66,7 +66,7 @@ pub struct MigrationSummary {
 const PRODUCT_FIELDS: &[&str] = &[
     "name", "slug", "status", "sku", "global_unique_id", "regular_price", "sale_price", "date_on_sale_from", "date_on_sale_to", "manage_stock", "stock_quantity",
     "stock_status", "backorders", "weight", "length", "width", "height", "shipping_class", "tax_status", "tax_class", "description", "short_description", "menu_order",
-    "featured", "catalog_visibility", "virtual", "downloadable", "tags", "attributes", "variation_attributes", "external_url", "button_text", "seo_title",
+    "featured", "catalog_visibility", "virtual", "downloadable", "sold_individually", "reviews_allowed", "purchase_note", "tags", "attributes", "variation_attributes", "external_url", "button_text", "seo_title",
     "seo_description", "focus_keyword",
 ];
 

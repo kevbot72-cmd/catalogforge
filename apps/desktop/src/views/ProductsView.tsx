@@ -1,5 +1,6 @@
 import { Columns3, Copy, Download, FileUp, Plus, RefreshCw, Search, Sparkles, Trash2, Undo2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { EditPanel } from "../components/EditPanel";
 import { columnsFor, presetsFor, ProductGrid } from "../components/ProductGrid";
 import { Button, clsx, Input, Select } from "../components/ui";
 import { useApp } from "../store/app";
@@ -14,6 +15,7 @@ function Chip({ active, onClick, children, testId }: { active: boolean; onClick:
 
 export function ProductsView() {
   const { query, setQuery, selection, openDialog, create, openDrawer, remove, summary, undo, pull, info } = useApp();
+  const panelDock = useApp((s) => s.panel.dock);
   const [search, setSearch] = useState(query.search ?? "");
   const [preset, setPreset] = useState<string>(() => {
     try {
@@ -87,9 +89,9 @@ export function ProductsView() {
         {summary.conflicts > 0 && <Chip active={!!query.only_conflicts} onClick={() => setQuery({ only_conflicts: !query.only_conflicts })}>Conflicts ({summary.conflicts})</Chip>}
         <span className="flex-1" />
         <div className="relative">
-          <Button size="sm" variant="ghost" icon={<Columns3 size={14} />} onClick={() => setPicker(!picker)}>{preset}</Button>
+          <Button size="sm" variant="ghost" icon={<Columns3 size={14} />} onClick={() => setPicker(!picker)} data-testid="views-button">{preset}</Button>
           {picker && (
-            <div className="absolute right-0 z-40 mt-1 w-64 rounded-lg border border-line bg-panel p-2 shadow-xl" onMouseLeave={() => setPicker(false)}>
+            <div className="absolute right-0 z-40 mt-1 w-64 rounded-lg border border-line bg-panel p-2 shadow-xl" onMouseLeave={() => setPicker(false)} data-testid="views-menu">
               <div className="mb-1 px-1 text-2xs font-semibold uppercase text-muted">Saved views</div>
               <div className="mb-2 flex flex-wrap gap-1">
                 {Object.keys(presets).map((p) => <Chip key={p} active={preset === p} onClick={() => savePreset(p)}>{p}</Chip>)}
@@ -117,7 +119,7 @@ export function ProductsView() {
               const ids = selection.map(Number).filter((n) => n > 0);
               if (ids.length) openDialog("clone", ids);
             }}>Clone to…</Button>
-            <Button size="sm" variant="ghost" icon={<Trash2 size={14} />} onClick={() => remove("product", selection)} data-testid="delete-selected">Delete</Button>
+            <Button size="sm" variant="close" icon={<Trash2 size={14} />} onClick={() => remove("product", selection)} data-testid="delete-selected">Delete</Button>
           </>
         )}
         <Button size="sm" variant="primary" icon={<Plus size={14} />} data-testid="new-product" onClick={async () => {
@@ -125,8 +127,11 @@ export function ProductsView() {
           openDrawer(k);
         }}>New</Button>
       </div>
-      <div className="min-h-0 flex-1">
-        <ProductGrid columns={columns} />
+      <div className={clsx("flex min-h-0 flex-1", panelDock === "bottom" && "flex-col")}>
+        <div className="min-h-0 min-w-0 flex-1">
+          <ProductGrid columns={columns} />
+        </div>
+        <EditPanel />
       </div>
     </div>
   );

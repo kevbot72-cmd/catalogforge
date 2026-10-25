@@ -68,7 +68,7 @@ export function AddStoreDialog() {
     <Modal open={open} onClose={() => openDialog(null)} title="Add a store" width={760} testId="add-store-dialog"
       footer={<>
         {error && <span className="mr-auto max-w-[460px] truncate text-xs text-removed" title={error}>{error}</span>}
-        <Button onClick={() => openDialog(null)}>Cancel</Button>
+        <Button variant="close" onClick={() => openDialog(null)}>Cancel</Button>
         <Button variant="primary" disabled={!valid || busy} onClick={submit} icon={busy ? <Loader2 size={14} className="animate-spin" /> : undefined} data-testid="connect-store">Connect</Button>
       </>}>
       <div className="grid grid-cols-4 gap-2">

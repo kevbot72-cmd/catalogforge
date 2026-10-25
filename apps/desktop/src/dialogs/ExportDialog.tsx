@@ -50,7 +50,7 @@ export function ExportDialog() {
         rows = [...rows, ...extra.filter((v) => !seen.has(v._state.key))];
       }
       const fields = info?.profile.custom_fields;
-      const defs = (columns === "view" ? currentColumns(fields) : columnsFor(fields)).filter((c) => c.title && c.kind !== "expander" && c.kind !== "image");
+      const defs = (columns === "view" ? currentColumns(fields) : columnsFor(fields)).filter((c) => c.title && c.kind !== "image");
       const cols: ExportColumn[] = [
         ...defs.map((c) => ({ id: c.id, title: c.title === "L" ? "Length" : c.title === "W" ? "Width" : c.title === "H" ? "Height" : c.title, numeric: NUMERIC.has(c.kind) || c.id === "id" })),
         ...(columns === "all" ? EXTRA.filter((e) => !defs.some((d) => d.id === e.id)) : []),
@@ -83,7 +83,7 @@ export function ExportDialog() {
   return (
     <Modal open={open} onClose={() => openDialog(null)} title="Export products" width={560} testId="export-dialog"
       footer={<>
-        <Button onClick={() => openDialog(null)}>Cancel</Button>
+        <Button variant="close" onClick={() => openDialog(null)}>Cancel</Button>
         <Button variant="primary" disabled={busy} onClick={run} icon={busy ? <Loader2 size={14} className="animate-spin" /> : undefined} data-testid="export-save">{backend.kind === "tauri" ? "Save as…" : "Download"}</Button>
       </>}>
       <div className="space-y-4">

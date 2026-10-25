@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { applyAppearance, isDark, loadAppearance, saveAppearance, type Appearance } from "../lib/theme";
 import type { Backend, Edit, Entity, Media, ProductQuery, Progress, StagedSummary, StoreInfo, StoreProfile, TaxonomyData } from "../backend/types";
 
 export type View = "products" | "batch" | "categories" | "media" | "catalogue" | "migration" | "history" | "settings";
@@ -9,6 +10,26 @@ export interface Toast {
   tone: "info" | "success" | "error";
   title: string;
   body?: string;
+}
+
+/** Bottom (or right-docked) edit panel on the Products page. */
+export interface PanelPrefs {
+  open: boolean;
+  dock: "bottom" | "right";
+  /** Height when docked at the bottom, width when docked on the right (px). */
+  bottomSize: number;
+  rightSize: number;
+  section: string;
+}
+
+const DEFAULT_PANEL: PanelPrefs = { open: true, dock: "bottom", bottomSize: 340, rightSize: 460, section: "general" };
+
+function loadPanel(): PanelPrefs {
+  try {
+    return { ...DEFAULT_PANEL, ...JSON.parse(localStorage.getItem("cf.panel") ?? "{}") };
+  } catch {
+    return DEFAULT_PANEL;
+  }
 }
 
 const EMPTY_SUMMARY: StagedSummary = { created: 0, modified: 0, deleted: 0, fields: 0, conflicts: 0, can_undo: false };
@@ -34,6 +55,10 @@ interface AppState {
   version: number;
   toasts: Toast[];
   dark: boolean;
+  appearance: Appearance;
+  panel: PanelPrefs;
+  /** Last row clicked in the grid; the edit panel shows it when nothing is ticked. */
+  focusKey: string | null;
   /** Ticking a sub-category for a product also ticks its parent categories. */
   catWithParents: boolean;
 
@@ -59,6 +84,9 @@ interface AppState {
   toast(t: Omit<Toast, "id">): void;
   dismissToast(id: number): void;
   setDark(d: boolean): void;
+  setAppearance(a: Partial<Appearance>): void;
+  setPanel(p: Partial<PanelPrefs>): void;
+  setFocusKey(key: string | null): void;
   setCatWithParents(v: boolean): void;
 }
 
@@ -92,6 +120,9 @@ export const useApp = create<AppState>((set, get) => ({
     }
   })(),
   dark: false,
+  appearance: loadAppearance(),
+  panel: loadPanel(),
+  focusKey: null,
 
   async init() {
     // Idempotent: React StrictMode runs mount effects twice in development.
@@ -119,7 +150,7 @@ export const useApp = create<AppState>((set, get) => ({
 
   async selectStore(id) {
     const { backend } = get();
-    set({ storeId: id, busy: "Opening store", info: null, taxonomy: null, selection: [], drawerKey: null, query: { sort: [{ field: "id", desc: true }], expanded: [] } });
+    set({ storeId: id, busy: "Opening store", info: null, taxonomy: null, selection: [], focusKey: null, drawerKey: null, query: { sort: [{ field: "id", desc: true }], expanded: [] } });
     try {
       localStorage.setItem("cf.store", id);
     } catch {
@@ -260,14 +291,24 @@ export const useApp = create<AppState>((set, get) => ({
     set({ catWithParents: v });
   },
   setDark(dark) {
-    document.documentElement.classList.toggle("dark", dark);
-    try {
-      localStorage.setItem("cf.dark", dark ? "1" : "0");
-    } catch {
-      /* ignore */
-    }
-    set({ dark });
+    get().setAppearance({ mode: dark ? "dark" : "light" });
   },
+  setAppearance(patch) {
+    const appearance = { ...get().appearance, ...patch };
+    saveAppearance(appearance);
+    applyAppearance(appearance);
+    set({ appearance, dark: isDark(appearance) });
+  },
+  setPanel(patch) {
+    const panel = { ...get().panel, ...patch };
+    try {
+      localStorage.setItem("cf.panel", JSON.stringify(panel));
+    } catch {
+      /* preference only */
+    }
+    set({ panel });
+  },
+  setFocusKey: (focusKey) => set({ focusKey }),
 }));
 
 export const PRODUCT_FIELD_LABELS: Record<string, string> = {

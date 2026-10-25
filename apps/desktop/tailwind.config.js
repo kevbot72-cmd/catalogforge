@@ -16,6 +16,16 @@ export default {
         added: "rgb(var(--added) / <alpha-value>)",
         changed: "rgb(var(--changed) / <alpha-value>)",
         removed: "rgb(var(--removed) / <alpha-value>)",
+        side: "rgb(var(--side) / <alpha-value>)",
+        close: "rgb(var(--close-fg) / <alpha-value>)",
+      },
+      // One corner setting (Settings → Appearance) scales every radius.
+      borderRadius: {
+        sm: "calc(var(--r) * 0.5)",
+        DEFAULT: "calc(var(--r) * 0.67)",
+        md: "var(--r)",
+        lg: "calc(var(--r) * 1.33)",
+        xl: "calc(var(--r) * 2)",
       },
       fontFamily: {
         sans: ["Inter", "ui-sans-serif", "system-ui", "-apple-system", "Segoe UI", "sans-serif"],

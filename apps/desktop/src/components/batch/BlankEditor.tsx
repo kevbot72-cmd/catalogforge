@@ -33,7 +33,7 @@ function OptionsEditor({ options, onChange, symbol }: { options: BlankOption[]; 
         <div key={i} className="space-y-2 rounded-md border border-line p-2.5">
           <div className="flex items-center gap-2">
             <Input value={o.name} placeholder="Option name, e.g. Size" onChange={(e) => set(i, { ...o, name: e.target.value })} className="flex-1" aria-label="Option name" />
-            <button type="button" className="text-muted hover:text-removed" onClick={() => onChange(options.filter((_, j) => j !== i))} aria-label={`Remove ${o.name || "option"}`}><Trash2 size={14} /></button>
+            <button type="button" className="cf-close rounded p-0.5" onClick={() => onChange(options.filter((_, j) => j !== i))} aria-label={`Remove ${o.name || "option"}`}><Trash2 size={14} /></button>
           </div>
           <table className="w-full text-[12.5px]">
             <thead className="text-left text-2xs uppercase text-muted"><tr><th className="pb-1 font-medium">Value</th><th className="pb-1 font-medium">Price ({symbol}) if different</th><th className="pb-1 font-medium">SKU ending</th><th /></tr></thead>
@@ -43,7 +43,7 @@ function OptionsEditor({ options, onChange, symbol }: { options: BlankOption[]; 
                   <td className="pr-1.5 pb-1"><Input value={v.value} placeholder="e.g. Large" onChange={(e) => set(i, { ...o, values: o.values.map((x, m) => (m === k ? { ...x, value: e.target.value } : x)) })} aria-label="Option value" /></td>
                   <td className="pr-1.5 pb-1"><Input value={v.price} inputMode="decimal" placeholder="same" onChange={(e) => set(i, { ...o, values: o.values.map((x, m) => (m === k ? { ...x, price: e.target.value } : x)) })} aria-label="Option price" /></td>
                   <td className="pr-1.5 pb-1"><Input value={v.sku} placeholder={v.value ? v.value.toUpperCase().replace(/[^A-Z0-9]+/g, "-") : "auto"} onChange={(e) => set(i, { ...o, values: o.values.map((x, m) => (m === k ? { ...x, sku: e.target.value } : x)) })} aria-label="SKU ending" /></td>
-                  <td className="pb-1"><button type="button" className="text-muted hover:text-removed" onClick={() => set(i, { ...o, values: o.values.filter((_, m) => m !== k) })} aria-label="Remove value"><Trash2 size={13} /></button></td>
+                  <td className="pb-1"><button type="button" className="cf-close rounded p-0.5" onClick={() => set(i, { ...o, values: o.values.filter((_, m) => m !== k) })} aria-label="Remove value"><Trash2 size={13} /></button></td>
                 </tr>
               ))}
             </tbody>

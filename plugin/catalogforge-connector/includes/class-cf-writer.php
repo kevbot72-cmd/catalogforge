@@ -424,7 +424,12 @@ class CF_Writer {
 		$this->apply_product_data( $product, $data, $is_variation );
 		$product->save();
 
-		$new_id          = $product->get_id();
+		$new_id = $product->get_id();
+		// Brands are a taxonomy, so they need the saved product's ID.
+		if ( ! $is_variation && array_key_exists( 'brand_ids', $data ) && taxonomy_exists( 'product_brand' ) ) {
+			wp_set_object_terms( $new_id, array_map( 'intval', array_map( array( $this, 'resolve' ), (array) $data['brand_ids'] ) ), 'product_brand' );
+		}
+		$this->touched[] = $new_id;
 		$this->touched[] = $new_id;
 		if ( $is_variation && $product->get_parent_id() ) {
 			$this->touched_parents[] = $product->get_parent_id();
@@ -513,6 +518,9 @@ class CF_Writer {
 			'catalog_visibility' => 'set_catalog_visibility',
 			'virtual'            => 'set_virtual',
 			'downloadable'       => 'set_downloadable',
+			'sold_individually'  => 'set_sold_individually',
+			'reviews_allowed'    => 'set_reviews_allowed',
+			'purchase_note'      => 'set_purchase_note',
 			'external_url'       => 'set_product_url',
 			'button_text'        => 'set_button_text',
 		);
@@ -543,6 +551,12 @@ class CF_Writer {
 			}
 			if ( array_key_exists( 'attributes', $data ) ) {
 				$product->set_attributes( $this->build_attributes( (array) $data['attributes'] ) );
+			}
+			if ( array_key_exists( 'upsell_ids', $data ) ) {
+				$product->set_upsell_ids( array_map( array( $this, 'resolve' ), (array) $data['upsell_ids'] ) );
+			}
+			if ( array_key_exists( 'cross_sell_ids', $data ) ) {
+				$product->set_cross_sell_ids( array_map( array( $this, 'resolve' ), (array) $data['cross_sell_ids'] ) );
 			}
 		} elseif ( array_key_exists( 'variation_attributes', $data ) ) {
 			$product->set_attributes( $this->variation_attributes( (array) $data['variation_attributes'] ) );

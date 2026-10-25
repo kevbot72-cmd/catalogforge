@@ -163,7 +163,7 @@ export function CategoriesView() {
             <div className="flex items-center gap-2">
               <h2 className="flex-1 text-lg font-semibold">{cat.name}</h2>
               <Button size="sm" onClick={() => (setQuery({ category_id: typeof cat.id === "number" && cat.id > 0 ? cat.id : null }), setView("products"))}>View products</Button>
-              <Button size="sm" variant="ghost" icon={<Trash2 size={14} />} onClick={() => (remove("category", [keyOf(cat)]), setSelected(null))}>Delete</Button>
+              <Button size="sm" variant="close" icon={<Trash2 size={14} />} onClick={() => (remove("category", [keyOf(cat)]), setSelected(null))}>Delete</Button>
             </div>
             <CategoryProducts cat={cat} />
             <div className="grid grid-cols-2 gap-4">

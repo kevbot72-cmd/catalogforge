@@ -63,6 +63,9 @@ pub struct PushReport {
 
 /* ===================================================================== pull */
 
+/// Bumped when products gain fields, so caches written by older versions re-download.
+const MODEL_VERSION: u32 = 2;
+
 pub async fn pull(driver: &dyn Driver, cache: &Mutex<Cache>, force_full: bool, progress: ProgressFn) -> Result<PullReport> {
     let start = Instant::now();
     progress(Progress { phase: "pull".into(), message: "Connecting".into(), ..Default::default() });
@@ -75,6 +78,9 @@ pub async fn pull(driver: &dyn Driver, cache: &Mutex<Cache>, force_full: bool, p
     cache.lock().unwrap().replace_taxonomy(&tax)?;
 
     let empty = cache.lock().unwrap().product_count()? == 0;
+    // Records cached by an older version lack newer fields: re-download them once.
+    let stale = cache.lock().unwrap().kv_get("model_version")?.and_then(|v| v.parse::<u32>().ok()).unwrap_or(0) < MODEL_VERSION;
+    let force_full = force_full || (stale && !empty);
     let index = if force_full && empty { None } else { driver.index().await.ok() };
     let mut report = PullReport { categories, ..Default::default() };
 
@@ -129,6 +135,7 @@ pub async fn pull(driver: &dyn Driver, cache: &Mutex<Cache>, force_full: bool, p
     let c = cache.lock().unwrap();
     report.products = c.product_count()?;
     c.kv_set("last_pull", &chrono::Utc::now().timestamp().to_string())?;
+    c.kv_set("model_version", &MODEL_VERSION.to_string())?;
     report.elapsed_ms = start.elapsed().as_millis();
     progress(Progress { phase: "pull".into(), done: report.fetched, total: report.fetched, message: "Up to date".into() });
     Ok(report)
@@ -718,7 +725,7 @@ fn category_path(cats: &HashMap<i64, Category>, id: i64) -> Vec<String> {
 const CLONE_FIELDS: &[&str] = &[
     "name", "slug", "status", "sku", "global_unique_id", "regular_price", "sale_price", "date_on_sale_from", "date_on_sale_to", "manage_stock", "stock_quantity",
     "stock_status", "backorders", "weight", "length", "width", "height", "shipping_class", "tax_status", "tax_class", "description", "short_description", "menu_order",
-    "featured", "catalog_visibility", "virtual", "downloadable", "tags", "attributes", "variation_attributes", "external_url", "button_text", "seo_title", "seo_description",
+    "featured", "catalog_visibility", "virtual", "downloadable", "sold_individually", "reviews_allowed", "purchase_note", "tags", "attributes", "variation_attributes", "external_url", "button_text", "seo_title", "seo_description",
     "focus_keyword",
 ];
 

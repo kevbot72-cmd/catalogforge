@@ -53,6 +53,12 @@ export interface Product {
   catalog_visibility: string;
   virtual: boolean;
   downloadable: boolean;
+  sold_individually: boolean;
+  reviews_allowed: boolean;
+  purchase_note: string;
+  upsell_ids: number[];
+  cross_sell_ids: number[];
+  brand_ids: number[];
   category_ids: (number | string)[];
   tags: string[];
   attributes: ProductAttribute[];
@@ -341,6 +347,8 @@ export interface TaxonomyData {
   attributes: AttributeTaxonomy[];
   shipping_classes: Term[];
   tax_classes: string[];
+  /** WooCommerce Brands (9.6+); empty when the store has none. */
+  brands?: Tag[];
 }
 
 export interface LocalFile {

@@ -46,6 +46,7 @@ const META_KEYS: &[&str] = &[
     "_manage_stock", "_stock", "_stock_status", "_backorders", "_weight", "_length", "_width", "_height",
     "_tax_status", "_tax_class", "_virtual", "_downloadable", "_thumbnail_id", "_product_image_gallery",
     "_product_attributes", "_product_url", "_button_text", "_variation_description",
+    "_sold_individually", "_purchase_note", "_upsell_ids", "_crosssell_ids",
     "_yoast_wpseo_title", "_yoast_wpseo_metadesc", "_yoast_wpseo_focuskw",
     "rank_math_title", "rank_math_description", "rank_math_focus_keyword",
     "_cf_seo_title", "_cf_seo_description", "_cf_focus_keyword",
@@ -158,7 +159,7 @@ impl MysqlDriver {
         let p = &self.p;
         let rows = sqlx::query(&format!(
             "SELECT ID, post_parent, post_type, post_status, post_title, post_name, post_content, post_excerpt, menu_order,
-                    CAST(post_date_gmt AS CHAR), CAST(post_modified_gmt AS CHAR)
+                    CAST(post_date_gmt AS CHAR), CAST(post_modified_gmt AS CHAR), comment_status
              FROM {p}posts WHERE post_type IN ('product','product_variation') AND post_status NOT IN ('trash','auto-draft')
                AND ID <> {} AND {where_sql}",
             self.placeholder
@@ -211,6 +212,13 @@ impl MysqlDriver {
             let t = terms.remove(&id).unwrap_or_default();
             let get = |k: &str| m.get(k).cloned().unwrap_or_default();
             let first_nonempty = |ks: &[&str]| ks.iter().map(|k| get(k)).find(|v| !v.is_empty()).unwrap_or_default();
+            let id_array = |k: &str| -> Vec<i64> {
+                match phpser::unserialize(&get(k)) {
+                    Ok(Value::Array(a)) => a.iter().filter_map(|x| x.as_i64().or_else(|| x.as_str().and_then(|s| s.parse().ok()))).collect(),
+                    Ok(Value::Object(o)) => o.values().filter_map(|x| x.as_i64().or_else(|| x.as_str().and_then(|s| s.parse().ok()))).collect(),
+                    _ => vec![],
+                }
+            };
             let tax_slugs = |tax: &str| t.iter().filter(|x| x.0 == tax).map(|x| x.3.clone()).collect::<Vec<_>>();
             let visibility = tax_slugs("product_visibility");
 
@@ -293,6 +301,12 @@ impl MysqlDriver {
                 catalog_visibility: catalog_visibility.into(),
                 is_virtual: get("_virtual") == "yes",
                 downloadable: get("_downloadable") == "yes",
+                sold_individually: get("_sold_individually") == "yes",
+                reviews_allowed: !is_var && r.try_get::<String, _>(11).map(|c| c == "open").unwrap_or(true),
+                purchase_note: if is_var { String::new() } else { get("_purchase_note") },
+                upsell_ids: if is_var { vec![] } else { id_array("_upsell_ids") },
+                cross_sell_ids: if is_var { vec![] } else { id_array("_crosssell_ids") },
+                brand_ids: if is_var { vec![] } else { t.iter().filter(|x| x.0 == "product_brand").map(|x| x.1).collect() },
                 category_ids: if is_var { vec![] } else { t.iter().filter(|x| x.0 == "product_cat").map(|x| x.1).collect() },
                 tags: if is_var { vec![] } else { t.iter().filter(|x| x.0 == "product_tag").map(|x| x.2.clone()).collect() },
                 attributes,
@@ -455,7 +469,7 @@ impl Driver for MysqlDriver {
         let term_rows = sqlx::query(&format!(
             "SELECT t.term_id, t.name, t.slug, tt.taxonomy, tt.parent, tt.description, tt.count
              FROM {p}terms t JOIN {p}term_taxonomy tt ON tt.term_id = t.term_id
-             WHERE tt.taxonomy IN ('product_cat','product_tag','product_shipping_class') OR tt.taxonomy LIKE 'pa\\_%'
+             WHERE tt.taxonomy IN ('product_cat','product_tag','product_shipping_class','product_brand') OR tt.taxonomy LIKE 'pa\\_%'
              ORDER BY t.name"
         ))
         .fetch_all(&self.pool)
@@ -500,6 +514,7 @@ impl Driver for MysqlDriver {
                     tax.categories.push(c);
                 }
                 "product_tag" => tax.tags.push(Tag { id, name: r.get(1), slug: r.get(2), count: r.get::<i64, _>(6) }),
+                "product_brand" => tax.brands.push(Tag { id, name: r.get(1), slug: r.get(2), count: r.get::<i64, _>(6) }),
                 "product_shipping_class" => tax.shipping_classes.push(Term { id, name: r.get(1), slug: r.get(2) }),
                 _ => attr_terms.entry(taxonomy).or_default().push(Term { id, name: r.get(1), slug: r.get(2) }),
             }

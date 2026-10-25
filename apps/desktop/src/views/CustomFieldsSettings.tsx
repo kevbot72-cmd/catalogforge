@@ -69,7 +69,7 @@ export function CustomFieldsSettings() {
                   <td className="w-32 py-1 pr-2">
                     <Select value={f.kind} onChange={(e) => update(f.key, { kind: e.target.value as CustomFieldKind })}>{KINDS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</Select>
                   </td>
-                  <td className="w-8"><button className="text-muted hover:text-removed" onClick={() => setFields(fields.filter((x) => x.key !== f.key))} aria-label={`Stop managing ${f.key}`}><Trash2 size={14} /></button></td>
+                  <td className="w-8"><button className="cf-close rounded p-0.5" onClick={() => setFields(fields.filter((x) => x.key !== f.key))} aria-label={`Stop managing ${f.key}`}><Trash2 size={14} /></button></td>
                 </tr>
               ))}
             </tbody>
@@ -78,7 +78,7 @@ export function CustomFieldsSettings() {
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" icon={busy === "scan" ? <Loader2 size={13} className="animate-spin" /> : <Search size={13} />} onClick={scan} disabled={!!busy} data-testid="cf-scan">Find fields on this store</Button>
           <span className="flex-1" />
-          {dirty && <Button size="sm" onClick={() => setFields(info?.profile.custom_fields ?? [])} disabled={!!busy}>Cancel</Button>}
+          {dirty && <Button size="sm" variant="close" onClick={() => setFields(info?.profile.custom_fields ?? [])} disabled={!!busy}>Cancel</Button>}
           <Button size="sm" variant="primary" disabled={!dirty || !!busy} onClick={save} icon={busy === "save" ? <Loader2 size={13} className="animate-spin" /> : undefined} data-testid="cf-save">Save and sync</Button>
         </div>
         {found && (

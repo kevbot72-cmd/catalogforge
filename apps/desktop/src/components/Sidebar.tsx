@@ -4,6 +4,7 @@ import type { CategoryRow, Edit, LocalFile, ProductRow } from "../backend/types"
 import { ancestorKeys, assignCategory, catKey } from "../lib/categoryAssign";
 import { useApp, type View } from "../store/app";
 import { categoryTree } from "./fields";
+import pkg from "../../package.json";
 import { Badge, clsx, Dropzone, mediaUrl, Thumb } from "./ui";
 
 const ENV_LABEL = { local: "Local", staging: "Staging", production: "Live" } as const;
@@ -44,7 +45,7 @@ function StoreSwitcher() {
 function NavItem({ id, icon, label, count }: { id: View; icon: React.ReactNode; label: string; count?: number }) {
   const { view, setView } = useApp();
   return (
-    <button onClick={() => setView(id)} className={clsx("flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[13px]", view === id ? "bg-sunken font-medium text-fg" : "text-muted hover:bg-sunken hover:text-fg")} data-testid={`nav-${id}`}>
+    <button onClick={() => setView(id)} className={clsx("flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[13px]", view === id ? "bg-accent/10 font-medium text-accent" : "text-muted hover:bg-sunken hover:text-fg")} data-testid={`nav-${id}`}>
       {icon}
       <span className="flex-1 text-left">{label}</span>
       {count !== undefined && count > 0 && <span className="text-2xs text-muted">{count.toLocaleString()}</span>}
@@ -153,11 +154,12 @@ function CategoryFilterTree() {
 }
 
 export function Sidebar() {
-  const { view, info, summary, dark, setDark, taxonomy, media } = useApp();
+  const { view, info, summary, dark, setDark, taxonomy, media, setView } = useApp();
   return (
-    <aside className="flex w-60 shrink-0 flex-col border-r border-line bg-panel">
+    <aside className="flex w-60 shrink-0 flex-col border-r border-line bg-side">
       <div className="flex items-center gap-2 px-4 pt-3 text-[13px] font-semibold">
         <Boxes size={16} className="text-accent" /> CatalogForge
+        <button onClick={() => setView("settings")} className="rounded-full bg-accent/10 px-2 py-px text-2xs font-semibold text-accent hover:bg-accent/20" title="Version · open Settings" data-testid="version-badge">{pkg.version}</button>
         <span className="flex-1" />
         <button onClick={() => setDark(!dark)} className="rounded p-1 text-muted hover:bg-sunken" aria-label="Toggle dark mode">
           {dark ? <Sun size={14} /> : <Moon size={14} />}

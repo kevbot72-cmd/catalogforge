@@ -44,11 +44,11 @@ await step("grid loads demo catalog", async () => {
 
 const grid = page.getByTestId("product-grid");
 const box = await grid.boundingBox();
-// Layout: row markers (~44px) | expand 28 | image 44 | name 300 | sku 140 …
+// Layout: row markers (~44px) | image 44 | name 300 | sku 140 | type 96 | status 110 | price …
 const cell = (x, row) => ({ x: box.x + x, y: box.y + 34 + 18 + row * 36 });
 
 await step("inline edit a cell (type + Enter) stages a change", async () => {
-  const p = cell(44 + 28 + 44 + 100, 0);
+  const p = cell(44 + 44 + 100, 0);
   await page.mouse.click(p.x, p.y);
   await page.waitForTimeout(250);
   await page.keyboard.type("Renamed via grid", { delay: 40 });
@@ -59,8 +59,8 @@ await step("inline edit a cell (type + Enter) stages a change", async () => {
 });
 
 await step("paste a range from Excel into the grid", async () => {
-  // Price column x: markers 44 + 28 + 44 + 300 + 140 + 84 + 84 = 724
-  const p = cell(724 + 40, 1);
+  // Price column x: markers 44 + 44 + 300 + 140 + 96 + 110 = 734
+  const p = cell(734 + 40, 1);
   await page.mouse.click(p.x, p.y);
   await page.waitForTimeout(250);
   await page.evaluate(() => navigator.clipboard.writeText("11.50\n12.50\n13.50"));
@@ -274,8 +274,8 @@ await step("custom fields: discover, pick, then edit in grid view and product ta
   await page.getByText("Custom fields saved").waitFor();
   await page.getByTestId("nav-products").click();
   if ((await page.getByTestId("filter-changed").getAttribute("class")).includes("text-accent")) await page.getByTestId("filter-changed").click();
-  await page.getByRole("button", { name: /^(Default|Custom|Pricing|Inventory|Shipping|SEO)$/ }).click();
-  await page.getByRole("button", { name: "Custom fields", exact: true }).click();
+  await page.getByTestId("views-button").click();
+  await page.getByTestId("views-menu").getByRole("button", { name: "Custom fields", exact: true }).click();
   await page.mouse.move(10, 10);
   await page.waitForTimeout(400);
   await shot("17-custom-fields-grid");
@@ -554,6 +554,102 @@ await step("migration: pre-flight, prepare, push and verify into an empty store"
   await page.waitForTimeout(800);
   expect((await page.getByTestId("migration-prepare").innerText()).includes("Nothing to move") || (await page.getByTestId("migration-stats").innerText()).includes("already there"), "second run skips everything");
 }, 120000);
+
+await step("grid: list cells open a dropdown; the ▸ in the name shows variations", async () => {
+  await page.getByTestId("nav-products").click();
+  await page.getByTestId("search").fill("");
+  await page.waitForTimeout(500);
+  const before = await pending();
+  // Status column: markers 44 + image 44 + name 300 + sku 140 + type 96.
+  const p = cell(624 + 40, 0);
+  await page.mouse.click(p.x, p.y);
+  await page.getByTestId("cell-dropdown").waitFor();
+  expect((await page.getByTestId("cell-dropdown").innerText()).includes("Pending review"), "status choices listed");
+  await shot("21-cell-dropdown");
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await page.waitForTimeout(400);
+  expect((await page.getByTestId("cell-dropdown").count()) === 0, "list closes after choosing");
+  expect((await pending()) === before + 1, `choosing stages one change (${before} → ${await pending()})`);
+  await page.getByTestId("undo").click();
+  await page.waitForTimeout(300);
+  // Variable products: the arrow sits in front of the name.
+  await page.getByLabel("Type filter").selectOption("variable");
+  await page.waitForTimeout(500);
+  const rows = Number(await grid.getAttribute("data-rows"));
+  await page.mouse.click(cell(44 + 44 + 12, 0).x, cell(44 + 44 + 12, 0).y);
+  await page.waitForTimeout(500);
+  expect(Number(await grid.getAttribute("data-rows")) > rows, "variations shown under the product");
+  await page.mouse.click(cell(44 + 44 + 12, 0).x, cell(44 + 44 + 12, 0).y);
+  await page.getByLabel("Type filter").selectOption("");
+  await page.waitForTimeout(400);
+});
+
+await step("edit panel: tick three products, see Mixed, change them all at once", async () => {
+  const tick = async (r) => page.mouse.click(cell(22, r).x, cell(22, r).y);
+  for (const r of [0, 1, 2]) await tick(r);
+  await page.waitForTimeout(500);
+  expect((await page.getByTestId("edit-panel-title").innerText()) === "Editing 3 products", "panel edits the ticked products");
+  await page.getByTestId("panel-section-general").click();
+  const price = page.getByTestId("panel-regular_price");
+  const before = await pending();
+  await price.fill("+10%");
+  expect((await page.getByTestId("edit-panel").innerText()).includes("change"), "maths shows how many products change");
+  await price.press("Enter");
+  await page.waitForTimeout(500);
+  expect((await pending()) >= before + 2, `price staged on the ticked products (${before} → ${await pending()})`);
+  await page.getByTestId("panel-section-inventory").click();
+  await page.getByTestId("panel-stock_status").selectOption("onbackorder");
+  await page.getByTestId("panel-section-tags").click();
+  await page.getByLabel("Add tag").fill("summer-sale");
+  await page.getByLabel("Add tag").press("Enter");
+  await page.waitForTimeout(400);
+  expect((await page.getByTestId("edit-panel").innerText()).includes("summer-sale"), "tag added to all");
+  // A dropdown on a ticked row applies to every ticked row.
+  const p = cell(624 + 40, 1);
+  await page.mouse.click(p.x, p.y);
+  await page.getByTestId("cell-dropdown").waitFor();
+  expect((await page.getByTestId("cell-dropdown").innerText()).includes("Applies to all 3 ticked rows"), "dropdown applies to the ticked rows");
+  await page.getByTestId("cell-dropdown").getByRole("option", { name: "Draft" }).click();
+  await page.waitForTimeout(400);
+  await page.getByTestId("panel-section-general").click();
+  expect((await page.getByTestId("panel-status").inputValue()) === "draft", "panel shows the new status");
+  await shot("22-edit-panel-multi");
+  await page.getByTestId("panel-discard").click();
+  await page.waitForTimeout(500);
+  expect((await page.getByTestId("panel-staged").count()) === 0, "discard clears the panel's changes");
+  expect((await pending()) === before, `back to where we were (${await pending()} vs ${before})`);
+  for (const r of [0, 1, 2]) await tick(r);
+  await page.waitForTimeout(300);
+});
+
+await step("edit panel: dock on the right, fold and reopen with Ctrl+E", async () => {
+  const panel = page.getByTestId("edit-panel");
+  await page.getByTestId("panel-dock").click();
+  await page.waitForTimeout(300);
+  expect((await panel.getAttribute("data-dock")) === "right", "docked right");
+  await shot("23-edit-panel-right");
+  await page.getByTestId("edit-panel-toggle").first().click();
+  expect((await panel.getAttribute("data-open")) === "false", "folded");
+  await page.keyboard.press("Control+e");
+  expect((await panel.getAttribute("data-open")) === "true", "Ctrl+E reopens");
+  await page.getByTestId("panel-dock").click();
+  expect((await panel.getAttribute("data-dock")) === "bottom", "back at the bottom");
+});
+
+await step("appearance: version badge opens Settings; theme and close-button style apply", async () => {
+  await page.getByTestId("version-badge").click();
+  await page.getByTestId("appearance").waitFor();
+  await page.getByTestId("theme-forest").click();
+  const accent = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--accent").trim());
+  expect(accent === "21 128 61", `forest accent applied (${accent})`);
+  await page.getByTestId("appearance-close").getByRole("radio", { name: "A · Red text" }).click();
+  expect((await page.evaluate(() => document.documentElement.dataset.close)) === "a", "close style A");
+  await shot("24-appearance");
+  await page.getByTestId("appearance-close").getByRole("radio", { name: "B · Outline" }).click();
+  await page.getByTestId("theme-indigo").click();
+  await page.getByTestId("appearance-mode").getByRole("radio", { name: "Light" }).click();
+});
 
 await step("dark mode", async () => {
   await page.getByTestId("nav-products").click();

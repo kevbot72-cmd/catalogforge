@@ -281,7 +281,9 @@ async fn taxonomy(state: State<'_, AppState>, id: String) -> CmdResult<Value> {
     let c = s.cache.lock().unwrap();
     let shipping: Value = c.kv_get("shipping_classes").map_err(err)?.and_then(|v| serde_json::from_str(&v).ok()).unwrap_or(json!([]));
     let tax: Value = c.kv_get("tax_classes").map_err(err)?.and_then(|v| serde_json::from_str(&v).ok()).unwrap_or(json!([]));
+    let brands: Value = c.kv_get("brands").map_err(err)?.and_then(|v| serde_json::from_str(&v).ok()).unwrap_or(json!([]));
     Ok(json!({
+        "brands": brands,
         "categories": c.category_rows().map_err(err)?,
         "tags": c.tags().map_err(err)?,
         "attributes": c.attributes().map_err(err)?,

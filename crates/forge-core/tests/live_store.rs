@@ -446,6 +446,61 @@ async fn formatted_descriptions_survive_a_push() {
     assert_eq!(stored, html, "WooCommerce keeps bullets, bold, colour and size");
 }
 
+/// The edit panel's extra fields: linked products, brands, purchase note, one-per-order, reviews.
+#[tokio::test]
+async fn linked_products_brands_and_advanced_fields_round_trip() {
+    let Some(driver) = connector() else { return eprintln!("CF_TEST_URL not set; skipping") };
+    let Some(root) = env("CF_TEST_WP_ROOT") else { return };
+    let s = sfx();
+    // A brand to tick (WooCommerce 9.6+ ships Brands).
+    let out = std::process::Command::new("php")
+        .current_dir(&root)
+        .args(["-r", &format!("require 'wp-load.php'; $t = wp_insert_term('Brand {s}', 'product_brand'); echo is_wp_error($t) ? 0 : $t['term_id'];")])
+        .output()
+        .unwrap();
+    let brand: i64 = String::from_utf8_lossy(&out.stdout).trim().rsplit('\n').next().unwrap_or("0").parse().unwrap_or(0);
+    assert!(brand > 0, "brand created: {}", String::from_utf8_lossy(&out.stderr));
+
+    let tmp = tempfile::tempdir().unwrap();
+    let cache = Mutex::new(Cache::open(&tmp.path().join("c.db")).unwrap());
+    for n in ["A", "B", "C"] {
+        cache.lock().unwrap().create(Entity::Product, obj(json!({ "name": format!("Link {n} {s}"), "type": "simple", "sku": format!("LNK-{n}-{s}"), "regular_price": "10" }))).unwrap();
+    }
+    let r = sync::push(&driver, &cache, &MediaSettings::default(), "Linked setup", no_progress()).await.unwrap();
+    assert!(r.errors.is_empty(), "{:?}", r.errors);
+    let id = |n: &str| -> i64 { cache.lock().unwrap().query(&ProductQuery { search: format!("LNK-{n}-{s}"), ..Default::default() }).unwrap().keys[0].parse().unwrap() };
+    let (a, b, c) = (id("A"), id("B"), id("C"));
+    let key = a.to_string();
+    let edit = |field: &str, value: Value| Edit { entity: Entity::Product, key: key.clone(), field: field.into(), value: Some(value) };
+    cache
+        .lock()
+        .unwrap()
+        .stage(&[
+            edit("upsell_ids", json!([b, c])),
+            edit("cross_sell_ids", json!([c])),
+            edit("brand_ids", json!([brand])),
+            edit("purchase_note", json!("Thanks for buying!")),
+            edit("sold_individually", json!(true)),
+            edit("reviews_allowed", json!(false)),
+        ])
+        .unwrap();
+    let r = sync::push(&driver, &cache, &MediaSettings::default(), "Linked fields", no_progress()).await.unwrap();
+    assert!(r.errors.is_empty() && r.conflicts == 0, "{:?}", r.errors);
+
+    let via_connector = driver.catalog_by_ids(&[a]).await.unwrap().products.remove(0);
+    let via_mysql = MysqlDriver::connect(&mysql_target(), None).await.unwrap().catalog_by_ids(&[a]).await.unwrap().products.remove(0);
+    for p in [&via_connector, &via_mysql] {
+        assert_eq!(p.upsell_ids, vec![b, c]);
+        assert_eq!(p.cross_sell_ids, vec![c]);
+        assert_eq!(p.brand_ids, vec![brand]);
+        assert_eq!(p.purchase_note, "Thanks for buying!");
+        assert!(p.sold_individually);
+        assert!(!p.reviews_allowed);
+    }
+    let tax = driver.taxonomy().await.unwrap();
+    assert!(tax.brands.iter().any(|t| t.id == brand), "brand listed in taxonomy");
+}
+
 /// Migrates the whole test catalogue into a second, empty store (CF_TEST2_*), then verifies it and
 /// checks that running it again creates nothing.
 #[tokio::test]

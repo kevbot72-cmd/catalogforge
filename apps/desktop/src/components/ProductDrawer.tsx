@@ -1,10 +1,10 @@
-import { Copy, Eye, EyeOff, Layers, RefreshCw, Trash2, X } from "lucide-react";
+import { Copy, Eye, EyeOff, Layers, RefreshCw, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { META_PREFIX, type CustomField, type Edit, type Entity, type MediaValue, type ProductAttribute, type ProductRow } from "../backend/types";
 import { useApp } from "../store/app";
 import { BufferedInput, CategoryPicker, GalleryEditor, LibraryPicker, TagInput } from "./fields";
 import { RichTextEditor } from "./RichTextEditor";
-import { Badge, Button, clsx, Field, mediaUrl, Modal, Select, Tabs, Thumb, Toggle } from "./ui";
+import { Badge, Button, CloseX, clsx, Field, mediaUrl, Modal, Select, Tabs, Thumb, Toggle } from "./ui";
 import { VariationsPanel } from "./VariationsPanel";
 
 type Tab = "general" | "description" | "media" | "variations" | "organisation" | "inventory" | "seo" | "custom";
@@ -89,10 +89,8 @@ export function ProductDrawer() {
           {row && row.type !== "variation" && (
             <Button size="sm" variant="ghost" icon={<Layers size={14} />} title="Clone to another store" onClick={() => typeof row.id === "number" && row.id > 0 && openDialog("clone", [row.id])} />
           )}
-          <Button size="sm" variant="ghost" icon={<Trash2 size={14} />} title="Delete" onClick={() => row && remove(entity, [row._state.key]).then(() => openDrawer(null))} />
-          <button onClick={() => openDrawer(null)} className="rounded p-1.5 text-muted hover:bg-sunken" aria-label="Close drawer">
-            <X size={16} />
-          </button>
+          <Button size="sm" variant="close" icon={<Trash2 size={14} />} title="Delete" onClick={() => row && remove(entity, [row._state.key]).then(() => openDrawer(null))} />
+          <CloseX onClick={() => openDrawer(null)} label="Close drawer" size={16} />
         </div>
         <Tabs<Tab>
           value={tab}
@@ -266,7 +264,7 @@ export function ProductDrawer() {
   );
 }
 
-function AttributesEditor({ attrs, onChange, changed }: { attrs: ProductAttribute[]; onChange: (a: ProductAttribute[]) => void; changed: boolean }) {
+export function AttributesEditor({ attrs, onChange, changed }: { attrs: ProductAttribute[]; onChange: (a: ProductAttribute[]) => void; changed: boolean }) {
   const { taxonomy } = useApp();
   return (
     <Field label="Attributes" className="col-span-2" changed={changed}>
@@ -284,7 +282,7 @@ function AttributesEditor({ attrs, onChange, changed }: { attrs: ProductAttribut
                 <label className="flex items-center gap-1"><input type="checkbox" checked={a.variation} onChange={(e) => onChange(attrs.map((x, j) => (j === i ? { ...x, variation: e.target.checked } : x)))} /> Used for variations</label>
               </div>
             </div>
-            <button type="button" className="text-muted hover:text-removed" onClick={() => onChange(attrs.filter((_, j) => j !== i))} aria-label="Remove attribute"><Trash2 size={14} /></button>
+            <button type="button" className="cf-close rounded p-0.5" onClick={() => onChange(attrs.filter((_, j) => j !== i))} aria-label="Remove attribute"><Trash2 size={14} /></button>
           </div>
         ))}
         <Select value="" onChange={(e) => {

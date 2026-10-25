@@ -391,7 +391,7 @@ export function BatchBuilderView() {
           </div>
 
           <div className="min-w-0 flex-[999_1_560px] space-y-4">
-            <Step n={3} title="Images" testId="step-images" right={(files.length > 0 || shared.length > 0) && <Button size="sm" variant="ghost" icon={<X size={13} />} onClick={() => { setFiles([]); setShared([]); }}>Clear</Button>}>
+            <Step n={3} title="Images" testId="step-images" right={(files.length > 0 || shared.length > 0) && <Button size="sm" variant="close" icon={<X size={13} />} onClick={() => { setFiles([]); setShared([]); }}>Clear</Button>}>
               <Dropzone toFiles={backend.filesFromDrop} onFiles={(f) => addFiles(f)} className="rounded-lg" testId="batch-drop">
                 <div className="flex flex-col items-center gap-1.5 rounded-lg border-2 border-dashed border-line p-5 text-center">
                   <ImagePlus size={24} className={files.length ? "text-added" : "text-muted"} />

@@ -31,7 +31,7 @@ export function CloneDialog() {
   };
   return (
     <Modal open={dialog === "clone"} onClose={() => openDialog(null)} title={`Clone ${ids.length} product${ids.length === 1 ? "" : "s"} to another store`} width={520}
-      footer={<><Button onClick={() => openDialog(null)}>Cancel</Button><Button variant="primary" disabled={!dst || busy} onClick={run}>Stage in destination</Button></>}>
+      footer={<><Button variant="close" onClick={() => openDialog(null)}>Cancel</Button><Button variant="primary" disabled={!dst || busy} onClick={run}>Stage in destination</Button></>}>
       {!others.length ? <p className="text-muted">Connect a second store first (e.g. your Local site and your live store).</p> : (
         <div className="space-y-4">
           <Field label="Destination">
