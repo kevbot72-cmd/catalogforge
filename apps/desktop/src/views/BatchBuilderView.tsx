@@ -148,7 +148,14 @@ export function BatchBuilderView() {
 
   /* -------------------------------------------------------------- images */
   const toImages = (list: LocalFile[]) => list.filter((f) => IMG.test(f.name)).map((f) => ({ ...f, id: `i${++seq.current}` }));
-  const addFiles = (list: LocalFile[]) => setFiles((cur) => [...cur, ...toImages(list).filter((f) => !cur.some((c) => c.path === f.path && c.name === f.name))]);
+  const addFiles = (list: LocalFile[], role?: "gallery") =>
+    setFiles((cur) => [...cur, ...toImages(list).map((f) => ({ ...f, role })).filter((f) => !cur.some((c) => c.path === f.path && c.name === f.name && c.role === f.role))]);
+  const productFiles = files.filter((f) => f.role !== "gallery").length;
+  const galleryFiles = files.length - productFiles;
+  const galleryPlaced = useMemo(() => {
+    const placed = new Set(assign.flat());
+    return files.filter((f) => f.role === "gallery" && placed.has(f.id)).length;
+  }, [assign, files]);
   const pick = (r: SlotRef) => {
     if (!sel) return setSel(r);
     const a = sel;
@@ -395,7 +402,7 @@ export function BatchBuilderView() {
               <Dropzone toFiles={backend.filesFromDrop} onFiles={(f) => addFiles(f)} className="rounded-lg" testId="batch-drop">
                 <div className="flex flex-col items-center gap-1.5 rounded-lg border-2 border-dashed border-line p-5 text-center">
                   <ImagePlus size={24} className={files.length ? "text-added" : "text-muted"} />
-                  <div className="text-[13px] font-medium">{files.length ? `${files.length} images loaded · drop more to add` : "Drop product images here"}</div>
+                  <div className="text-[13px] font-medium">{productFiles ? `${productFiles} product images loaded · drop more to add` : "Drop product images here"}</div>
                   <Button size="sm" onClick={async () => addFiles(await backend.pickFiles({ multiple: true, extensions: ["jpg", "jpeg", "png", "webp", "gif", "avif"] }))} data-testid="batch-pick-images">Choose images…</Button>
                 </div>
               </Dropzone>
@@ -409,9 +416,19 @@ export function BatchBuilderView() {
                   ? "The last number in each file name picks the product: cat-05.png becomes product 5's featured image, cat-05a.png, cat-05b.png… its gallery."
                   : `Files are sorted by name and handed out ${slots} per product: featured image first, then the gallery.`}
               </p>
+              <Dropzone toFiles={backend.filesFromDrop} onFiles={(f) => addFiles(f, "gallery")} className="rounded-lg" testId="batch-gallery-drop">
+                <div className="flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-line px-3 py-2">
+                  <Button size="sm" icon={<Plus size={13} />} onClick={async () => addFiles(await backend.pickFiles({ multiple: true, extensions: ["jpg", "jpeg", "png", "webp", "gif", "avif"] }), "gallery")} data-testid="batch-gallery">Gallery images…</Button>
+                  <span className="min-w-0 flex-1 text-xs text-muted" data-testid="batch-gallery-note">
+                    {galleryFiles
+                      ? `${galleryFiles} gallery images · ${galleryPlaced} matched to a product${galleryPlaced < galleryFiles ? ` · ${galleryFiles - galleryPlaced} without a match or a free gallery slot` : ""}`
+                      : "Drop or choose a second folder (e.g. lifestyle shots). Each product gets the gallery image with the same file name as its featured image, or the same number."}
+                  </span>
+                </div>
+              </Dropzone>
               <div className="flex flex-wrap items-center gap-2">
                 <Button size="sm" icon={<Plus size={13} />} onClick={async () => { const picked = toImages(await backend.pickFiles({ multiple: true, extensions: ["jpg", "jpeg", "png", "webp", "gif"] })); setShared((cur) => [...cur.filter((c) => !picked.some((p) => p.name === c.name)), ...picked]); }} data-testid="batch-shared">Shared gallery images…</Button>
-                <span className="text-xs text-muted">{shared.length ? `Added to every product: ${shared.map((s) => s.name).join(", ")}` : "e.g. a size chart, added to every product's gallery (uploaded once)."}</span>
+                <span className="text-xs text-muted">{shared.length ? `Added to every product: ${shared.map((s) => s.name).join(", ")}` : "The same image for every product, e.g. a size chart (uploaded once)."}</span>
               </div>
               {files.length > 0 && <ImageSlots items={items} assign={assign} files={fileMap} selected={sel} onPick={pick} slots={slots} />}
             </Step>

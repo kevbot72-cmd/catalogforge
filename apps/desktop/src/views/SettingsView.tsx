@@ -7,7 +7,7 @@ import { AppearanceSettings } from "./AppearanceSettings";
 import { CustomFieldsSettings } from "./CustomFieldsSettings";
 
 export function SettingsView() {
-  const { backend, info, stores, storeId, refreshStores, selectStore, toast } = useApp();
+  const { backend, info, stores, storeId, refreshStores, selectStore, toast, autoSync, setAutoSync } = useApp();
   const [ms, setMs] = useState<MediaSettings | null>(null);
   useEffect(() => {
     backend.getMediaSettings().then(setMs);
@@ -22,6 +22,13 @@ export function SettingsView() {
     <div className="h-full overflow-auto">
       <div className="mx-auto max-w-4xl space-y-8 p-6">
         <AppearanceSettings />
+        <section>
+          <h2 className="mb-3 text-sm font-semibold">Syncing</h2>
+          <div className="rounded-lg border border-line bg-panel p-4">
+            <Toggle checked={autoSync} onChange={setAutoSync} label="Check the store for changes when I come back to CatalogForge" />
+            <p className="mt-1.5 pl-9 text-2xs text-muted">Changes made in WordPress meanwhile are pulled in automatically (at most every 20 seconds). Your unpushed edits are kept, and anything edited on both sides shows as a conflict as usual.</p>
+          </div>
+        </section>
         <section>
           <h2 className="mb-3 text-sm font-semibold">Image processing</h2>
           {ms && (

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyMass, isApplicable, MASS_FIELDS, type MassOp } from "./massChange";
+import { applyMany, applyMass, isApplicable, MASS_FIELDS, type MassOp } from "./massChange";
 import type { ProductRow } from "../backend/types";
 
 const F = (k: string) => MASS_FIELDS.find((f) => f.key === k)!;
@@ -33,5 +33,25 @@ describe("mass change", () => {
     expect(isApplicable(row({ type: "variable" }), F("regular_price"))).toBe(false);
     expect(isApplicable(row({ type: "variation" }), F("regular_price"))).toBe(true);
     expect(isApplicable(row({ type: "variation" }), F("category_ids"))).toBe(false);
+  });
+});
+
+describe("several changes in one bulk edit", () => {
+  const f = (key: string) => MASS_FIELDS.find((x) => x.key === key)!;
+  const p = (o: Record<string, unknown>) => ({ type: "simple", regular_price: "100.00", sale_price: "", status: "publish", tags: [], _state: { key: String(o.id), is_new: false, deleted: false, dirty: [], conflicts: [] }, ...o }) as unknown as ProductRow;
+  it("applies changes in order, each seeing the one before", () => {
+    const rows = [p({ id: 1 }), p({ id: 2, regular_price: "50.00" })];
+    const { changes } = applyMany(rows, [
+      { field: f("regular_price"), op: "inc_pct", value: "10" },
+      { field: f("sale_price"), op: "pct_off_regular", value: "20" },
+      { field: f("status"), op: "set", value: "draft" },
+    ]);
+    expect(changes[0].diffs.map((d) => [d.field.key, d.after])).toEqual([["regular_price", "110.00"], ["sale_price", "88.00"], ["status", "draft"]]);
+    expect(changes[1].diffs[1].after).toBe("44.00");
+  });
+  it("names the change that has a bad value and leaves untouched fields out", () => {
+    expect(() => applyMany([p({ id: 1 })], [{ field: f("status"), op: "set", value: "draft" }, { field: f("regular_price"), op: "add", value: "abc" }])).toThrow(/^Change 2: /);
+    const { changes } = applyMany([p({ id: 1, status: "draft" })], [{ field: f("status"), op: "set", value: "draft" }, { field: f("tags"), op: "add_items", value: "", items: ["sale"] }]);
+    expect(changes[0].diffs.map((d) => d.field.key)).toEqual(["tags"]);
   });
 });

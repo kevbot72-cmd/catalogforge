@@ -172,3 +172,48 @@ export function isApplicable(row: ProductRow, field: MassField): boolean {
   if (row.type === "variable" && ["regular_price", "sale_price"].includes(field.key)) return false;
   return true;
 }
+
+export interface RowChanges {
+  row: ProductRow;
+  diffs: { field: MassField; before: unknown; after: unknown }[];
+}
+
+/**
+ * Applies several bulk changes in order. Each change sees the result of the ones before it, so
+ * "price +10%" followed by "sale price = 20% off regular" uses the new price. Returns, per product,
+ * only the fields that end up different. Throws "Change N: …" for a bad value.
+ */
+export function applyMany(rows: ProductRow[], ops: MassOp[]): { changes: RowChanges[]; skipped: number } {
+  const changes: RowChanges[] = [];
+  let skipped = 0;
+  for (const row of rows) {
+    const work = { ...row } as Record<string, unknown>;
+    let any = false;
+    ops.forEach((m, n) => {
+      if (!isApplicable(row, m.field)) return;
+      any = true;
+      let after: unknown;
+      try {
+        after = applyMass(work as unknown as ProductRow, m);
+      } catch (e) {
+        throw new Error(ops.length > 1 ? `Change ${n + 1}: ${(e as Error).message}` : (e as Error).message);
+      }
+      if (after !== undefined) work[m.field.key] = after;
+    });
+    if (!any) {
+      skipped++;
+      continue;
+    }
+    const seen = new Set<string>();
+    const diffs: RowChanges["diffs"] = [];
+    for (const m of ops) {
+      if (seen.has(m.field.key)) continue;
+      seen.add(m.field.key);
+      const before = (row as Record<string, unknown>)[m.field.key];
+      const after = work[m.field.key];
+      if (JSON.stringify(before) !== JSON.stringify(after)) diffs.push({ field: m.field, before, after });
+    }
+    if (diffs.length) changes.push({ row, diffs });
+  }
+  return { changes, skipped };
+}

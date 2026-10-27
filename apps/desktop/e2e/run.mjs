@@ -483,6 +483,19 @@ await step("batch builder: blank × collection, matched images, add to store, co
   await page.getByTestId("image-slots").waitFor();
   expect((await page.getByTestId("slot-0-0").getAttribute("aria-label")).startsWith("cat-01.png"), "matched by number");
   expect((await page.getByTestId("slot-0-1").getAttribute("aria-label")).startsWith("cat-01a.png"), "gallery by letter");
+  // A second folder of gallery images with the same file names: each goes to its own product only.
+  const gdir = `${SHOTS}batch-gallery/`;
+  mk(gdir, { recursive: true });
+  for (const n of ["cat-02.png", "cat-03.png"]) writeFileSync(gdir + n, png);
+  const [gchooser] = await Promise.all([page.waitForEvent("filechooser"), page.getByTestId("batch-gallery").click()]);
+  await gchooser.setFiles(["cat-02.png", "cat-03.png"].map((n) => gdir + n));
+  await page.waitForTimeout(300);
+  expect((await page.getByTestId("batch-gallery-note").innerText()).startsWith("2 gallery images · 2 matched"), await page.getByTestId("batch-gallery-note").innerText());
+  for (const [i, n] of [[1, "cat-02.png"], [2, "cat-03.png"]]) {
+    expect((await page.getByTestId(`slot-${i}-0`).getAttribute("aria-label")).startsWith(n), `product ${i + 1} keeps its featured image`);
+    expect((await page.getByTestId(`slot-${i}-1`).getAttribute("aria-label")).startsWith(n), `product ${i + 1} gets only its own gallery image`);
+  }
+  expect((await page.getByTestId("slot-0-1").getAttribute("aria-label")).startsWith("cat-01a.png"), "product 1's gallery unchanged");
   // Swap products 2 and 3's featured images, then back.
   await page.getByTestId("slot-1-0").click();
   await page.getByTestId("slot-2-0").click();
@@ -683,6 +696,41 @@ await step("select categories box filters the products", async () => {
   await page.waitForTimeout(500);
   expect(Number(await grid.getAttribute("data-rows")) === all, "cleared");
 });
+
+await step("bulk edit: three changes in one go (price, status, tag), one undo", async () => {
+  await onProducts();
+  const before = await pending();
+  await page.getByTestId("open-mass-change").click();
+  await page.getByTestId("mass-change").waitFor();
+  await page.getByTestId("mass-value").fill("10");
+  await page.getByTestId("mass-add").click();
+  await page.getByTestId("mass-field-2").selectOption("status");
+  await page.getByTestId("mass-enum-2").selectOption("private");
+  await page.getByTestId("mass-add").click();
+  await page.getByTestId("mass-field-3").selectOption("tags");
+  const tags = page.getByTestId("mass-change-item-3").getByPlaceholder("Tags");
+  await tags.fill("bundle");
+  await tags.press("Enter");
+  await page.waitForTimeout(400);
+  const preview = await page.getByTestId("mass-preview").innerText();
+  expect(preview.includes("Regular price") && preview.includes("Status") && preview.includes("Tags") && preview.includes("bundle"), `preview lists all three changes: ${preview.slice(0, 200)}`);
+  await shot("27-bulk-edit-multi");
+  await page.getByTestId("mass-apply").click();
+  await page.getByTestId("mass-change").waitFor({ state: "hidden" });
+  await page.waitForTimeout(400);
+  expect((await pending()) > before, "changes staged");
+  await page.getByTestId("undo").click();
+  await page.waitForTimeout(400);
+  expect((await pending()) === before, "one undo reverses all three");
+});
+
+await step("auto-sync: coming back to the window checks the store", async () => {
+  const synced = page.getByText(/^synced /);
+  // The sync guard skips anything synced in the last 20 seconds; wait that out if needed.
+  if ((await synced.innerText()).includes("just now")) await page.waitForFunction(() => ![...document.querySelectorAll("span")].some((s) => s.textContent === "synced just now"), null, { timeout: 70000 });
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await page.waitForFunction(() => [...document.querySelectorAll("span")].some((s) => s.textContent === "synced just now"), null, { timeout: 10000 });
+}, 90000);
 
 await step("views: new view, rename, drag a column, kept after closing; delete", async () => {
   await onProducts();

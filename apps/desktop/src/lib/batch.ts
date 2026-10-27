@@ -216,6 +216,8 @@ export function nextNumber(b: Blank, c: Collection, storeSkus: string[]): { next
 
 export interface BatchImage extends LocalFile {
   id: string;
+  /** Loaded as gallery images (often a second folder with the same file names as the featured images). */
+  role?: "gallery";
 }
 
 export function fileNumber(name: string): number | null {
@@ -229,21 +231,59 @@ const natural = (a: { name: string }, b: { name: string }) => a.name.localeCompa
  * Assigns images to products: slot 0 is the featured image, then the gallery. "number" matches
  * the last number in each file name to the product number (cat-05.png, cat-05a.png…); "order"
  * hands files out in name order.
+ *
+ * Gallery images (role "gallery") never become featured images. Each one goes to the product
+ * whose featured image has the same file name (folder A/Xmas-01.webp → folder B/Xmas-01.webp),
+ * otherwise to the product with the same number, otherwise (in "order" mode) in name order.
  */
 export function matchImages(items: BatchItem[], files: BatchImage[], mode: "number" | "order", slots: number): (string | null)[][] {
   const sorted = [...files].sort(natural);
+  const main = sorted.filter((f) => f.role !== "gallery");
+  const gallery = sorted.filter((f) => f.role === "gallery");
   const out = items.map(() => Array<string | null>(slots).fill(null));
   if (mode === "number") {
     const groups = new Map<number, string[]>();
-    for (const f of sorted) {
+    for (const f of main) {
       const n = fileNumber(f.name);
       if (n !== null) groups.set(n, [...(groups.get(n) ?? []), f.id]);
     }
     items.forEach((it, i) => (groups.get(it.n) ?? []).slice(0, slots).forEach((id, j) => (out[i][j] = id)));
   } else {
-    sorted.forEach((f, k) => {
-      const i = Math.floor(k / slots);
-      if (i < items.length) out[i][k % slots] = f.id;
+    // With a separate gallery folder, the main files are featured images only: one per product.
+    const per = gallery.length ? 1 : slots;
+    main.forEach((f, k) => {
+      const i = Math.floor(k / per);
+      if (i < items.length) out[i][k % per] = f.id;
+    });
+  }
+  if (!gallery.length) return out;
+
+  const byId = new Map(files.map((f) => [f.id, f]));
+  const stem = (n: string) => n.replace(/\.[^.]+$/, "").toLowerCase();
+  const used = new Set<string>();
+  const place = (i: number, id: string) => {
+    const j = out[i].findIndex((x, k) => k > 0 && x === null);
+    if (j < 0) return false;
+    out[i][j] = id;
+    used.add(id);
+    return true;
+  };
+  // 1. Same file name as the product's featured image (the extension may differ).
+  items.forEach((_, i) => {
+    const featured = out[i][0] ? byId.get(out[i][0]!) : undefined;
+    if (!featured) return;
+    for (const g of gallery) if (!used.has(g.id) && stem(g.name) === stem(featured.name)) place(i, g.id);
+  });
+  // 2. Same number as the product (Xmas-01-back.webp → product 1).
+  items.forEach((it, i) => {
+    for (const g of gallery) if (!used.has(g.id) && fileNumber(g.name) === it.n) place(i, g.id);
+  });
+  // 3. "File order": whatever is left goes in name order to products that still have room.
+  if (mode === "order") {
+    const left = gallery.filter((g) => !used.has(g.id));
+    let k = 0;
+    items.forEach((_, i) => {
+      if (k < left.length && out[i].slice(1).every((x) => x === null)) place(i, left[k++].id);
     });
   }
   return out;

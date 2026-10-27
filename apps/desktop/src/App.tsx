@@ -84,6 +84,23 @@ export function App() {
     setAppearance({});
     init();
   }, [init, setAppearance]);
+  // Coming back to CatalogForge (e.g. after editing in WordPress) syncs quietly, at most every 20s.
+  useEffect(() => {
+    let last = 0;
+    const back = () => {
+      const st = useApp.getState();
+      if (document.visibilityState === "hidden" || !st.autoSync || !st.storeId || st.busy || st.dialog) return;
+      if (Date.now() - last < 20_000 || Date.now() / 1000 - (st.info?.last_pull ?? 0) < 20) return;
+      last = Date.now();
+      void st.pull(false, { auto: true });
+    };
+    window.addEventListener("focus", back);
+    document.addEventListener("visibilitychange", back);
+    return () => {
+      window.removeEventListener("focus", back);
+      document.removeEventListener("visibilitychange", back);
+    };
+  }, []);
   // "Match computer" follows the system setting live.
   useEffect(() => {
     if (appearance.mode !== "system") return;

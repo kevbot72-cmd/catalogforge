@@ -34,6 +34,19 @@ describe("batch builder", () => {
     expect(matchImages(items, files, "order", 1)).toEqual([["cat-32.png"], ["cat-32a.png"], ["cat-33.png"]]);
   });
 
+  it("gives each product the gallery image with the same file name, never all of them", () => {
+    const f = (dir: string, name: string, role?: "gallery"): BatchImage => ({ id: `${dir}/${name}`, name, path: `/${dir}/${name}`, url: "", size: 1, role });
+    const items = buildItems(MUG_BLANK, col);
+    // Folder A holds the featured images, folder B the gallery images, with identical names.
+    const files = [f("A", "cat-32.webp"), f("A", "cat-33.webp"), f("A", "cat-34.webp"), f("B", "cat-34.webp", "gallery"), f("B", "cat-32.webp", "gallery"), f("B", "cat-33.jpg", "gallery")];
+    expect(matchImages(items, files, "number", 2)).toEqual([["A/cat-32.webp", "B/cat-32.webp"], ["A/cat-33.webp", "B/cat-33.jpg"], ["A/cat-34.webp", "B/cat-34.webp"]]);
+    // Gallery images are never used as featured images, and match by name in "order" mode too.
+    expect(matchImages(items, files, "order", 2).map((r) => r[1])).toEqual(["B/cat-32.webp", "B/cat-33.jpg", "B/cat-34.webp"]);
+    // Names that only share the number still match ("Xmas-01-back" → product 1).
+    const named = [f("A", "front-32.webp"), f("B", "back-32.webp", "gallery"), f("B", "back-99.webp", "gallery")];
+    expect(matchImages(items, named, "number", 3)[0]).toEqual(["A/front-32.webp", "B/back-32.webp", null]);
+  });
+
   it("plans simple products with categories, tags and {price} filled in", () => {
     const items = buildItems(MUG_BLANK, col);
     const { sheet, cfg } = toImport(items, MUG_BLANK, col, []);

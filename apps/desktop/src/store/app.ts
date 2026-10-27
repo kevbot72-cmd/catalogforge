@@ -77,7 +77,10 @@ interface AppState {
   remove(entity: Entity, keys: string[]): Promise<void>;
   undo(): Promise<void>;
   discardAll(): Promise<void>;
-  pull(full?: boolean): Promise<void>;
+  pull(full?: boolean, opts?: { auto?: boolean }): Promise<void>;
+  /** Sync quietly when the window gets focus again (changes made in WordPress meanwhile). */
+  autoSync: boolean;
+  setAutoSync(v: boolean): void;
   /** Asks "Are you sure you want to push changes?" first; pushNow runs after Yes. */
   push(label?: string): Promise<void>;
   pushNow(label?: string): Promise<void>;
@@ -91,6 +94,7 @@ interface AppState {
 }
 
 let toastId = 0;
+let autoSyncFailed = false;
 let initStarted = false;
 
 export const useApp = create<AppState>((set, get) => ({
@@ -120,6 +124,13 @@ export const useApp = create<AppState>((set, get) => ({
     }
   })(),
   dark: false,
+  autoSync: (() => {
+    try {
+      return localStorage.getItem("cf.autoSync") !== "0";
+    } catch {
+      return true;
+    }
+  })(),
   appearance: loadAppearance(),
   panel: loadPanel(),
   focusKey: null,
@@ -229,20 +240,33 @@ export const useApp = create<AppState>((set, get) => ({
     set({ summary, version: get().version + 1, taxonomy: await backend.taxonomy(storeId), media: new Map((await backend.media(storeId)).map((m) => [m.id, m])) });
   },
 
-  async pull(full = false) {
+  async pull(full = false, opts = {}) {
     const { backend, storeId } = get();
     if (!storeId) return;
-    set({ busy: "Syncing with store" });
+    set({ busy: opts.auto ? "Checking the store for changes" : "Syncing with store" });
     try {
       const r = await backend.pull(storeId, full);
       set({ info: await backend.openStore(storeId) });
       await get().refreshMeta();
-      get().toast({ tone: "success", title: r.mode === "delta" ? `Synced — ${r.fetched} changed, ${r.removed} removed` : `Downloaded ${r.products.toLocaleString()} products` });
+      autoSyncFailed = false;
+      // An automatic sync only speaks up when something actually changed on the store.
+      if (!opts.auto) get().toast({ tone: "success", title: r.mode === "delta" ? `Synced — ${r.fetched} changed, ${r.removed} removed` : `Downloaded ${r.products.toLocaleString()} products` });
+      else if (r.mode !== "delta" || r.fetched || r.removed) get().toast({ tone: "info", title: "Updated from your store", body: r.mode === "delta" ? `${r.fetched} changed, ${r.removed} removed in WordPress since the last sync.` : `${r.products.toLocaleString()} products re-read.` });
     } catch (e) {
-      get().toast({ tone: "error", title: "Sync failed", body: String(e) });
+      // Don't repeat the same error every time the window gets focus (e.g. while offline).
+      if (!opts.auto || !autoSyncFailed) get().toast({ tone: "error", title: opts.auto ? "Couldn't check the store for changes" : "Sync failed", body: String(e) });
+      if (opts.auto) autoSyncFailed = true;
     } finally {
       set({ busy: null, progress: null, version: get().version + 1 });
     }
+  },
+  setAutoSync(v) {
+    try {
+      localStorage.setItem("cf.autoSync", v ? "1" : "0");
+    } catch {
+      /* preference only */
+    }
+    set({ autoSync: v });
   },
 
   async push(label) {
