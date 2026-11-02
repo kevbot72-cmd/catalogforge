@@ -37,7 +37,7 @@ function NameInput({ initial, onSave, onCancel, testId }: { initial: string; onS
 /**
  * The views button on the products page: pick a saved view, add a new one from the current
  * columns, rename or delete your own views, reset a changed built-in view, and choose or
- * reorder columns. Everything is saved straight away and kept when CatalogForge closes.
+ * reorder columns. Everything is saved straight away and kept when StoreGenie Pro closes.
  */
 export function ViewsMenu({ state, onChange, builtIns, allColumns, columnIds }: {
   state: ViewState;

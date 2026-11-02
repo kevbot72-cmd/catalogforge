@@ -3,7 +3,7 @@ name = "forge-core"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "CatalogForge engine: connections, local cache, staging, sync and media pipeline"
+description = "StoreGenie Pro engine: connections, local cache, staging, sync and media pipeline"
 
 [dependencies]
 anyhow = "1"

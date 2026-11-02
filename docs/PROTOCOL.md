@@ -22,7 +22,7 @@ Every request carries:
 6. `sha256(body bytes as sent)`,
 7. `sha256(X-CF-Manifest header or "")`.
 
-Keys are bound to a WordPress user with `manage_woocommerce`, and requests run as that user, so capabilities, kses rules and authorship behave as in wp-admin. Keys are created in *Tools → CatalogForge*, or automatically for Local sites. The connection string is `cf1.` + base64url(JSON `{v,url,rest,key,secret}`).
+Keys are bound to a WordPress user with `manage_woocommerce`, and requests run as that user, so capabilities, kses rules and authorship behave as in wp-admin. Keys are created in *Tools → StoreGenie Pro*, or automatically for Local sites. The connection string is `cf1.` + base64url(JSON `{v,url,rest,key,secret}`).
 
 A body sent with `X-CF-Encoding: gzip` is gunzipped after the signature check. The signature covers the compressed bytes.
 

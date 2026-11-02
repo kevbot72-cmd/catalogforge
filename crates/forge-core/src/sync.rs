@@ -237,7 +237,7 @@ async fn resolve_media(driver: &dyn Driver, cache: &Mutex<Cache>, settings: &Med
     }
     if caps.media_by_url_only {
         if let Some((_, (r, ..))) = refs.iter().find(|(_, (r, ..))| r.0 == "file") {
-            return Err(anyhow!("Local image files ({}) need the CatalogForge Connector plugin; the stock REST API only accepts public image URLs.", r.1));
+            return Err(anyhow!("Local image files ({}) need the StoreGenie Pro Connector plugin; the stock REST API only accepts public image URLs.", r.1));
         }
         return Ok(()); // URL refs are sent as image_urls in the payload.
     }
@@ -498,7 +498,7 @@ pub async fn push(driver: &dyn Driver, cache: &Mutex<Cache>, settings: &MediaSet
     let start = Instant::now();
     let caps = driver.capabilities();
     if !caps.write {
-        return Err(anyhow!("This connection is read-only. Add the CatalogForge Connector plugin to push changes."));
+        return Err(anyhow!("This connection is read-only. Add the StoreGenie Pro Connector plugin to push changes."));
     }
     let mut report = PushReport::default();
     if cache.lock().unwrap().kv_get("handshake")?.is_none() {

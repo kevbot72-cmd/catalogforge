@@ -12,7 +12,7 @@
  *
  * All modes de-duplicate by SHA-256 of the original file.
  *
- * @package CatalogForge
+ * @package StoreGeniePro
  */
 
 defined( 'ABSPATH' ) || exit;

@@ -47,9 +47,19 @@ await page.goto(BASE);
 await page.evaluate(() => localStorage.clear());
 await page.goto(BASE);
 
+await step("welcome screen: pick a store and enter", async () => {
+  await page.getByTestId("splash").waitFor();
+  expect((await page.getByTestId("splash-greeting").innerText()) === "Welcome to StoreGenie Pro", "first launch greeting");
+  expect((await page.getByTestId("splash-store").locator("option").count()) >= 2, "stores listed");
+  await shot("00-welcome");
+  await page.getByTestId("splash-enter").click();
+  await page.getByTestId("splash").waitFor({ state: "hidden" });
+});
+
 await step("grid loads demo catalog", async () => {
   await page.waitForFunction(() => Number(document.querySelector('[data-testid="product-grid"]')?.getAttribute("data-rows")) > 100, null, { timeout: 15000 });
   await page.waitForTimeout(500);
+  expect((await page.getByTestId("push-status").getAttribute("data-state")) === "clean", "status starts green: all pushed");
   await shot("01-products-grid");
 });
 
@@ -66,6 +76,7 @@ await step("inline edit a cell (type + Enter) stages a change", async () => {
   await page.keyboard.press("Enter");
   await page.waitForTimeout(400);
   expect((await pending()) === 1, `expected 1 pending change, got ${await pending()}`);
+  expect((await page.getByTestId("push-status").getAttribute("data-state")) === "pending", "status turns amber with unpushed edits");
 });
 
 await step("paste a range from Excel into the grid", async () => {
@@ -478,6 +489,12 @@ await step("batch builder: blank × collection, matched images, add to store, co
   await page.getByTestId("col-start").fill("1");
   await page.getByTestId("col-count").fill("3");
   expect((await page.getByTestId("batch-stats").innerText()).startsWith("3"), "three products planned");
+  // Opt menu: rename the blank.
+  await page.getByTestId("blank-actions").click();
+  await page.getByTestId("blank-rename").click();
+  await page.getByTestId("blank-name-input").fill("Mug 11oz white");
+  await page.getByTestId("blank-name-save").click();
+  expect((await page.getByTestId("blank-select").locator("option:checked").innerText()) === "Mug 11oz white", "blank renamed");
   const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.getByTestId("batch-pick-images").click()]);
   await chooser.setFiles(names.map((n) => dir + n));
   await page.getByTestId("image-slots").waitFor();
@@ -763,6 +780,7 @@ await step("views: new view, rename, drag a column, kept after closing; delete",
   // Closing and reopening the app keeps the view and its column order.
   await page.reload();
   // (Demo data lives in memory, so the store may be empty after a reload; the views are what matter.)
+  await page.getByTestId("splash-enter").click();
   await page.getByTestId("views-button").waitFor({ timeout: 15000 });
   expect((await page.getByTestId("views-button").innerText()).includes("Weekly stocktake"), "view kept after reopening");
   expect((await order()).join() === cols.join(), "column order kept after reopening");
@@ -771,6 +789,32 @@ await step("views: new view, rename, drag a column, kept after closing; delete",
   await page.getByLabel("Delete Weekly stocktake").click();
   await page.keyboard.press("Escape");
   expect((await page.getByTestId("views-button").innerText()).includes("Default"), "back on Default after deleting");
+});
+
+await step("your details: name, nickname, picture; welcome back next launch", async () => {
+  await page.getByTestId("nav-settings").click();
+  await page.getByTestId("user-details").waitFor();
+  await page.getByTestId("user-name").fill("Kevin Smith");
+  await page.getByTestId("user-name").press("Enter");
+  await page.getByTestId("user-alias").fill("Kev");
+  await page.getByTestId("user-alias").press("Enter");
+  await page.getByTestId("user-store-name").fill("BluMoonDesign");
+  await page.getByTestId("user-store-name").press("Enter");
+  const { writeFileSync } = await import("node:fs");
+  const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+  writeFileSync(`${SHOTS}avatar.png`, png);
+  const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.getByTestId("user-avatar-upload").click()]);
+  await chooser.setFiles(`${SHOTS}avatar.png`);
+  await page.getByTestId("user-avatar").waitFor();
+  await shot("28-your-details");
+  await page.reload();
+  await page.getByTestId("splash").waitFor();
+  expect((await page.getByTestId("splash-greeting").innerText()) === "Welcome back, Kev!", await page.getByTestId("splash-greeting").innerText());
+  expect((await page.getByTestId("splash").innerText()).includes("BluMoonDesign"), "business name shown");
+  await shot("29-welcome-back");
+  // "Take me to settings" opens the store on the Settings page.
+  await page.getByTestId("splash-settings").click();
+  await page.getByTestId("user-details").waitFor();
 });
 
 await step("dark mode", async () => {

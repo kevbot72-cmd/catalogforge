@@ -1,21 +1,21 @@
 <?php
 /**
- * Plugin Name:       CatalogForge Connector
- * Description:       High-throughput, signed bridge between the CatalogForge desktop app and this WooCommerce store: bulk catalog export, bulk upserts through WooCommerce CRUD with deferred housekeeping, zero-CPU media ingestion, and theme-accurate live previews.
- * Version:           0.3.0
+ * Plugin Name:       StoreGenie Pro Connector
+ * Description:       High-throughput, signed bridge between the StoreGenie Pro desktop app and this WooCommerce store: bulk catalog export, bulk upserts through WooCommerce CRUD with deferred housekeeping, zero-CPU media ingestion, and theme-accurate live previews.
+ * Version:           0.4.0
  * Requires at least: 6.2
  * Requires PHP:      7.4
- * Author:            CatalogForge
+ * Author:            StoreGenie Pro
  * License:           GPL-2.0-or-later
  * Text Domain:       catalogforge
  * WC requires at least: 8.0
  *
- * @package CatalogForge
+ * @package StoreGeniePro
  */
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'CATALOGFORGE_VERSION', '0.3.0' );
+define( 'CATALOGFORGE_VERSION', '0.4.0' );
 define( 'CATALOGFORGE_PROTOCOL', 1 );
 define( 'CATALOGFORGE_DIR', __DIR__ );
 

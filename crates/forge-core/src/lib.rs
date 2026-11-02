@@ -1,4 +1,4 @@
-//! CatalogForge core engine.
+//! StoreGenie Pro core engine.
 //!
 //! * [`connection`] — multi-store profiles and secret storage
 //! * [`local`] — Local (Flywheel) site discovery

@@ -20,7 +20,7 @@
        │              │               connector             writes + direct-to-disk media
        ▼              ▼                 ▼                        ▼
   ┌──────────────────── WordPress + WooCommerce ───────────────────────────────────┐
-  │ CatalogForge Connector plugin: bulk CRUD writer · media ingest · preview ·     │
+  │ StoreGenie Pro Connector plugin: bulk CRUD writer · media ingest · preview ·     │
   │ catalog/index/taxonomy export                                                  │
   └────────────────────────────────────────────────────────────────────────────────┘
 ```

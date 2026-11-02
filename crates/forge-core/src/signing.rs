@@ -65,7 +65,7 @@ pub struct ConnectionString {
 pub fn parse_connection_string(s: &str) -> anyhow::Result<ConnectionString> {
     use base64::Engine;
     let s = s.trim();
-    let body = s.strip_prefix("cf1.").ok_or_else(|| anyhow::anyhow!("Connection strings start with \"cf1.\" — copy it from Tools → CatalogForge in wp-admin."))?;
+    let body = s.strip_prefix("cf1.").ok_or_else(|| anyhow::anyhow!("Connection strings start with \"cf1.\" — copy it from Tools → StoreGenie Pro in wp-admin."))?;
     let raw = base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(body.trim_end_matches('='))?;
     Ok(serde_json::from_slice(&raw)?)
 }

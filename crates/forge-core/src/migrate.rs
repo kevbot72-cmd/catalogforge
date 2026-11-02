@@ -2,7 +2,7 @@
 //! products, variations, tags, global attributes, images, SEO and custom fields) from one store
 //! into another, usually a new, empty one.
 //!
-//! Like everything else in CatalogForge, a migration is *staged* in the destination store as one
+//! Like everything else in StoreGenie Pro, a migration is *staged* in the destination store as one
 //! undoable step, so it can be reviewed before it is pushed. Images are referenced by their source
 //! URL; on push the app downloads them itself and uploads them to the destination, which works even
 //! when the source is a Local site on this computer that the new host could never reach.

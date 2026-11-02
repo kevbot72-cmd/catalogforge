@@ -15,7 +15,7 @@
  * PHP-serialized array so the desktop app can provision a key directly in a Local site's
  * database without a PHP runtime).
  *
- * @package CatalogForge
+ * @package StoreGeniePro
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -119,7 +119,7 @@ class CF_Auth {
 		$sig   = (string) $request->get_header( 'x_cf_signature' );
 
 		if ( '' === $key || '' === $ts || '' === $nonce || '' === $sig ) {
-			return new WP_Error( 'cf_unsigned', 'Missing CatalogForge signature headers.', array( 'status' => 401 ) );
+			return new WP_Error( 'cf_unsigned', 'Missing StoreGenie Pro signature headers.', array( 'status' => 401 ) );
 		}
 		$keys = self::get_keys();
 		if ( empty( $keys[ $key ]['secret'] ) ) {

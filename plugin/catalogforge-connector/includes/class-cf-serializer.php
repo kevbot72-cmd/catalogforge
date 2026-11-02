@@ -1,8 +1,8 @@
 <?php
 /**
- * Converts WooCommerce objects to the CatalogForge wire format (and holds the shared field lists).
+ * Converts WooCommerce objects to the StoreGenie Pro wire format (and holds the shared field lists).
  *
- * @package CatalogForge
+ * @package StoreGeniePro
  */
 
 defined( 'ABSPATH' ) || exit;

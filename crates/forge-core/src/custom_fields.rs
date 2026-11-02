@@ -36,7 +36,7 @@ pub struct MetaKeyInfo {
     pub source: String,
 }
 
-/// Keys WooCommerce, WordPress or CatalogForge already handle as built-in fields.
+/// Keys WooCommerce, WordPress or StoreGenie Pro already handle as built-in fields.
 pub fn is_internal_key(k: &str) -> bool {
     const EXACT: &[&str] = &[
         "_sku", "_global_unique_id", "_price", "_regular_price", "_sale_price", "_sale_price_dates_from", "_sale_price_dates_to",

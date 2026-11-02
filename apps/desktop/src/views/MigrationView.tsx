@@ -145,9 +145,9 @@ export function MigrationView() {
   const dstWritable = dstInfo?.capabilities.write ?? true;
   const urlOnly = dstInfo?.capabilities.media_by_url_only;
   const srcIsLocal = srcInfo?.profile.connection.kind === "local" || /\.(local|test)\b|localhost|127\.0\.0\.1/.test(srcInfo?.handshake?.home_url ?? "");
-  const blockers = [!dstWritable && `${dstInfo?.profile.name} is connected read-only. Connect it with the CatalogForge Connector to write to it.`].filter(Boolean) as string[];
+  const blockers = [!dstWritable && `${dstInfo?.profile.name} is connected read-only. Connect it with the StoreGenie Pro Connector to write to it.`].filter(Boolean) as string[];
   const notes = [
-    urlOnly && opts.include_images && `${dstInfo?.profile.name} uses the WooCommerce REST API, which can only fetch images from public web addresses${srcIsLocal ? ", and this source is on your computer, so its images can't be copied that way" : ""}. Connect it with the CatalogForge Connector to copy images reliably.`,
+    urlOnly && opts.include_images && `${dstInfo?.profile.name} uses the WooCommerce REST API, which can only fetch images from public web addresses${srcIsLocal ? ", and this source is on your computer, so its images can't be copied that way" : ""}. Connect it with the StoreGenie Pro Connector to copy images reliably.`,
   ].filter(Boolean) as string[];
   const nothing = preview && preview.products_create + preview.products_update + preview.categories_create === 0;
 

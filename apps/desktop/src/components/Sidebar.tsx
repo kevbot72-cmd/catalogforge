@@ -1,4 +1,4 @@
-import { BookOpen, Boxes, Layers, Truck, ChevronDown, ChevronRight, FolderTree, History, Image as ImageIcon, Moon, Package, Plus, Settings, Sun, Tag } from "lucide-react";
+import { AlertTriangle, BookOpen, CheckCircle2, CircleDot, Layers, Loader2, Truck, ChevronDown, ChevronRight, FolderTree, History, Image as ImageIcon, Moon, Package, Plus, Settings, Sun, Tag } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CategoryRow, Edit, LocalFile, ProductRow } from "../backend/types";
 import { ancestorKeys, assignCategory, catKey } from "../lib/categoryAssign";
@@ -154,11 +154,11 @@ function CategoryFilterTree() {
 }
 
 export function Sidebar() {
-  const { view, info, summary, dark, setDark, taxonomy, media, setView } = useApp();
+  const { view, info, dark, setDark, taxonomy, media, setView } = useApp();
   return (
     <aside className="flex w-60 shrink-0 flex-col border-r border-line bg-side">
-      <div className="flex items-center gap-2 px-4 pt-3 text-[13px] font-semibold">
-        <Boxes size={16} className="text-accent" /> CatalogForge
+      <div className="flex items-center gap-2 whitespace-nowrap px-4 pt-3 text-[13px] font-semibold">
+        <img src="/brand/mark.png" alt="" width={22} height={22} className="h-[22px] w-[22px] shrink-0" draggable={false} /> StoreGenie Pro
         <button onClick={() => setView("settings")} className="rounded-full bg-accent/10 px-2 py-px text-2xs font-semibold text-accent hover:bg-accent/20" title="Version · open Settings" data-testid="version-badge">{pkg.version}</button>
         <span className="flex-1" />
         <button onClick={() => setDark(!dark)} className="rounded p-1 text-muted hover:bg-sunken" aria-label="Toggle dark mode">
@@ -177,11 +177,42 @@ export function Sidebar() {
         <NavItem id="settings" icon={<Settings size={15} />} label="Settings" />
       </nav>
       {view === "products" ? <CategoryFilterTree /> : <div className="flex-1" />}
-      <div className="border-t border-line px-4 py-2 text-2xs text-muted">
-        <Tag size={11} className="mr-1 inline" />
-        {summary.fields + summary.created + summary.deleted > 0 ? `${summary.created + summary.modified + summary.deleted} records changed locally` : "All changes pushed"}
-      </div>
+      <PushStatus />
     </aside>
+  );
+}
+
+/** Bottom-left status: green when everything is pushed, amber with unpushed edits, red for conflicts. */
+function PushStatus() {
+  const { summary, busy, storeId, toggleChanges } = useApp();
+  const pending = summary.created + summary.modified + summary.deleted;
+  const state = !storeId ? "none" : busy === "Pushing changes" ? "pushing" : summary.conflicts > 0 ? "conflict" : pending > 0 ? "pending" : "clean";
+  const text = {
+    none: "No store open",
+    pushing: "Pushing changes…",
+    conflict: `${summary.conflicts.toLocaleString()} conflict${summary.conflicts === 1 ? "" : "s"} to sort out`,
+    pending: `${pending.toLocaleString()} record${pending === 1 ? "" : "s"} not pushed yet`,
+    clean: "All changes pushed",
+  }[state];
+  const Icon = state === "clean" ? CheckCircle2 : state === "conflict" ? AlertTriangle : state === "pushing" ? Loader2 : state === "pending" ? CircleDot : Tag;
+  return (
+    <button
+      onClick={() => (state === "pending" || state === "conflict") && toggleChanges(true)}
+      className={clsx(
+        "flex items-center gap-1.5 border-t border-line px-4 py-2 text-left text-xs font-semibold",
+        state === "clean" && "text-green-700 dark:text-green-400",
+        state === "pending" && "text-amber-700 hover:bg-amber-500/10 dark:text-amber-400",
+        state === "conflict" && "text-red-700 hover:bg-red-500/10 dark:text-red-400",
+        state === "pushing" && "text-accent",
+        state === "none" && "font-medium text-muted",
+      )}
+      title={state === "pending" || state === "conflict" ? "Show the changes" : undefined}
+      data-testid="push-status"
+      data-state={state}
+    >
+      <Icon size={13} className={clsx("shrink-0", state === "pushing" && "animate-spin")} />
+      {text}
+    </button>
   );
 }
 

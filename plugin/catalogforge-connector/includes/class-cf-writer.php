@@ -22,7 +22,7 @@
  *   "options": { "conflicts": "check" | "overwrite", "transaction": true, "return_records": true }
  * }
  *
- * @package CatalogForge
+ * @package StoreGeniePro
  */
 
 defined( 'ABSPATH' ) || exit;

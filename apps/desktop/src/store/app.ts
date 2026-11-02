@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { loadProfile, saveProfile, type UserProfile } from "../lib/profile";
 import { applyAppearance, isDark, loadAppearance, saveAppearance, type Appearance } from "../lib/theme";
 import type { Backend, Edit, Entity, Media, ProductQuery, Progress, StagedSummary, StoreInfo, StoreProfile, TaxonomyData } from "../backend/types";
 
@@ -56,6 +57,12 @@ interface AppState {
   toasts: Toast[];
   dark: boolean;
   appearance: Appearance;
+  user: UserProfile;
+  setUser(p: Partial<UserProfile>): void;
+  /** The welcome screen shown at launch, where the store is chosen. */
+  splash: boolean;
+  /** Opens the chosen store from the welcome screen (and optionally goes to Settings). */
+  enterStore(id: string, view?: View): Promise<void>;
   panel: PanelPrefs;
   /** Last row clicked in the grid; the edit panel shows it when nothing is ticked. */
   focusKey: string | null;
@@ -132,6 +139,8 @@ export const useApp = create<AppState>((set, get) => ({
     }
   })(),
   appearance: loadAppearance(),
+  user: loadProfile(),
+  splash: true,
   panel: loadPanel(),
   focusKey: null,
 
@@ -144,15 +153,19 @@ export const useApp = create<AppState>((set, get) => ({
       if (id === get().storeId) set({ progress: p.phase === "done" ? null : p });
     });
     await get().refreshStores();
-    let last: string | null = null;
-    try {
-      last = localStorage.getItem("cf.store");
-    } catch {
-      /* storage unavailable */
-    }
-    const stores = get().stores;
-    const target = stores.find((s) => s.id === last) ?? stores[0];
-    if (target) await get().selectStore(target.id);
+    // The store is chosen on the welcome screen; with no stores yet it offers to add one.
+    set({ splash: true });
+  },
+
+  async enterStore(id, view = "products") {
+    set({ splash: false, view });
+    if (id !== get().storeId) await get().selectStore(id);
+  },
+
+  setUser(patch) {
+    const user = { ...get().user, ...patch };
+    saveProfile(user);
+    set({ user });
   },
 
   async refreshStores() {

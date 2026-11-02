@@ -4,6 +4,7 @@ import { ChangesPanel } from "./components/ChangesPanel";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ProductDrawer } from "./components/ProductDrawer";
 import { Sidebar } from "./components/Sidebar";
+import { Splash } from "./components/Splash";
 import { Badge, Button, clsx, Empty, ProgressBar, timeAgo } from "./components/ui";
 import { AddStoreDialog } from "./dialogs/AddStoreDialog";
 import { CloneDialog } from "./dialogs/CloneDialog";
@@ -84,7 +85,7 @@ export function App() {
     setAppearance({});
     init();
   }, [init, setAppearance]);
-  // Coming back to CatalogForge (e.g. after editing in WordPress) syncs quietly, at most every 20s.
+  // Coming back to StoreGenie Pro (e.g. after editing in WordPress) syncs quietly, at most every 20s.
   useEffect(() => {
     let last = 0;
     const back = () => {
@@ -119,7 +120,7 @@ export function App() {
           <main className="relative min-w-0 flex-1 overflow-hidden">
             {!storeId ? (
               <Empty title={stores.length ? "Choose a store" : "Connect your first store"}>
-                <p className="mb-3">Sites running in Local are detected automatically. Live stores connect with the CatalogForge Connector plugin or the WooCommerce REST API.</p>
+                <p className="mb-3">Sites running in Local are detected automatically. Live stores connect with the StoreGenie Pro Connector plugin or the WooCommerce REST API.</p>
                 <Button variant="primary" onClick={() => openDialog("add-store")}>Add store</Button>
               </Empty>
             ) : (
@@ -144,6 +145,7 @@ export function App() {
       <CommandPalette />
       <PushConfirmDialog />
       <Toasts />
+      <Splash />
     </div>
   );
 }

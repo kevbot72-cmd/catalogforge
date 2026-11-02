@@ -131,7 +131,7 @@ async fn ensure_key(db: &MysqlDriver, known: Option<LocalKey>) -> Result<LocalKe
     let key = LocalKey { key: format!("cf_local_{}", &uuid::Uuid::new_v4().simple().to_string()[..12]), secret: hex::encode(rand::random::<[u8; 32]>()) };
     keys.insert(
         key.key.clone(),
-        serde_json::json!({ "secret": key.secret, "user_id": admin, "label": "CatalogForge (Local)", "created": chrono::Utc::now().timestamp() }),
+        serde_json::json!({ "secret": key.secret, "user_id": admin, "label": "StoreGenie Pro (Local)", "created": chrono::Utc::now().timestamp() }),
     );
     db.set_option("catalogforge_keys", &serde_json::Value::Object(keys).to_string(), false).await?;
     Ok(key)

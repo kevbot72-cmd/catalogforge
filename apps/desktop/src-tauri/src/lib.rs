@@ -507,7 +507,7 @@ async fn catalogue_image(src: String, max: u32, quality: u8) -> CmdResult<tauri:
                 .timeout(std::time::Duration::from_secs(45))
                 // Local sites use self-signed certificates; these are public product images.
                 .danger_accept_invalid_certs(true)
-                .user_agent(concat!("CatalogForge/", env!("CARGO_PKG_VERSION")))
+                .user_agent(concat!("StoreGeniePro/", env!("CARGO_PKG_VERSION")))
                 .build()
                 .expect("http client")
         });
@@ -629,5 +629,5 @@ pub fn run() {
             read_file, write_file, get_media_settings, set_media_settings
         ])
         .run(tauri::generate_context!())
-        .expect("error while running CatalogForge");
+        .expect("error while running StoreGenie Pro");
 }

@@ -4,6 +4,7 @@ import type { MediaSettings } from "../backend/types";
 import { Badge, Button, Field, Input, Select, Toggle } from "../components/ui";
 import { useApp } from "../store/app";
 import { AppearanceSettings } from "./AppearanceSettings";
+import { UserSettings } from "./UserSettings";
 import { CustomFieldsSettings } from "./CustomFieldsSettings";
 
 export function SettingsView() {
@@ -21,11 +22,12 @@ export function SettingsView() {
   return (
     <div className="h-full overflow-auto">
       <div className="mx-auto max-w-4xl space-y-8 p-6">
+        <UserSettings />
         <AppearanceSettings />
         <section>
           <h2 className="mb-3 text-sm font-semibold">Syncing</h2>
           <div className="rounded-lg border border-line bg-panel p-4">
-            <Toggle checked={autoSync} onChange={setAutoSync} label="Check the store for changes when I come back to CatalogForge" />
+            <Toggle checked={autoSync} onChange={setAutoSync} label="Check the store for changes when I come back to StoreGenie Pro" />
             <p className="mt-1.5 pl-9 text-2xs text-muted">Changes made in WordPress meanwhile are pulled in automatically (at most every 20 seconds). Your unpushed edits are kept, and anything edited on both sides shows as a conflict as usual.</p>
           </div>
         </section>
@@ -74,7 +76,7 @@ export function SettingsView() {
               )}
               <div className="pt-2">
                 <Button size="sm" variant="danger" onClick={async () => {
-                  if (!storeId || !window.confirm(`Remove “${info.profile.name}” from CatalogForge? Nothing on the store is changed, but unpushed edits are lost.`)) return;
+                  if (!storeId || !window.confirm(`Remove “${info.profile.name}” from StoreGenie Pro? Nothing on the store is changed, but unpushed edits are lost.`)) return;
                   await backend.removeStore(storeId);
                   await refreshStores();
                   const next = useApp.getState().stores[0];
@@ -86,7 +88,7 @@ export function SettingsView() {
             </div>
           </section>
         )}
-        <section className="text-xs text-muted" data-testid="app-version">CatalogForge {pkg.version} · {stores.length} store{stores.length === 1 ? "" : "s"} connected · running in {backend.kind === "demo" ? "demo mode (sample data in your browser)" : "desktop mode"}</section>
+        <section className="text-xs text-muted" data-testid="app-version">StoreGenie Pro {pkg.version} · {stores.length} store{stores.length === 1 ? "" : "s"} connected · running in {backend.kind === "demo" ? "demo mode (sample data in your browser)" : "desktop mode"}</section>
       </div>
     </div>
   );

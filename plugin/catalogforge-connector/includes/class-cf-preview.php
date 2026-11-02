@@ -6,7 +6,7 @@
  * store's real single-product template (theme, blocks, plugins) with the draft values overlaid
  * in memory. Nothing is written to the product.
  *
- * @package CatalogForge
+ * @package StoreGeniePro
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -57,7 +57,7 @@ class CF_Preview {
 			return $id;
 		}
 		$p = new WC_Product_Simple();
-		$p->set_name( 'CatalogForge preview placeholder' );
+		$p->set_name( 'StoreGenie Pro preview placeholder' );
 		$p->set_status( 'draft' );
 		$p->set_catalog_visibility( 'hidden' );
 		$p->update_meta_data( '_cf_preview_placeholder', 1 );

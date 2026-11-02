@@ -78,5 +78,5 @@ impl MetaKeys {
 }
 
 pub(crate) fn unsupported(what: &str, kind: &str) -> anyhow::Error {
-    anyhow::anyhow!("{what} is not available over a {kind} connection. Install the CatalogForge Connector plugin to enable it.")
+    anyhow::anyhow!("{what} is not available over a {kind} connection. Install the StoreGenie Pro Connector plugin to enable it.")
 }

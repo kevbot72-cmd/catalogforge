@@ -12,7 +12,7 @@ export function prettyKey(k: string) {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-/** Per-store choice of which plugin fields (product meta) CatalogForge manages. */
+/** Per-store choice of which plugin fields (product meta) StoreGenie Pro manages. */
 export function CustomFieldsSettings() {
   const { backend, storeId, info, pull, toast } = useApp();
   const [fields, setFields] = useState<CustomField[]>(info?.profile.custom_fields ?? []);
@@ -111,7 +111,7 @@ export function CustomFieldsSettings() {
           </div>
         )}
         {info?.profile.connection.kind === "rest" && (
-          <p className="text-2xs text-muted">Over the WooCommerce REST API, fields whose key starts with “_” are hidden by WooCommerce. Connect with the CatalogForge Connector to manage those too.</p>
+          <p className="text-2xs text-muted">Over the WooCommerce REST API, fields whose key starts with “_” are hidden by WooCommerce. Connect with the StoreGenie Pro Connector to manage those too.</p>
         )}
       </div>
     </section>

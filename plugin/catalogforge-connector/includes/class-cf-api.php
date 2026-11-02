@@ -1,8 +1,8 @@
 <?php
 /**
- * REST routes under /catalogforge/v1. All routes require a valid CatalogForge signature.
+ * REST routes under /catalogforge/v1. All routes require a valid StoreGenie Pro signature.
  *
- * @package CatalogForge
+ * @package StoreGeniePro
  */
 
 defined( 'ABSPATH' ) || exit;

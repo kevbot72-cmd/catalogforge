@@ -4,7 +4,7 @@
 
 Tested against WordPress 6.8.3 + WooCommerce 9.9.5 on MariaDB (PHP built-in server):
 
-- **Plugin smoke test (40 checks):** signing, replay protection, a variable product with global attributes plus categories created through references in one batch, idempotent SKU matching, conflict detection, media upload with client-made sizes and deduplication, category and media updates, export, preview (existing and unsaved products, coming-soon mode), delete.
+- **Plugin smoke test (40 checks, plugin 0.4.0):** signing, replay protection, a variable product with global attributes plus categories created through references in one batch, idempotent SKU matching, conflict detection, media upload with client-made sizes and deduplication, category and media updates, export, preview (existing and unsaved products, coming-soon mode), delete.
 - **Engine integration tests (9):**
   - the full cycle: pull → stage → push with images → conflict → resolve → revert from history → delta pull with remote deletion → category filter → preview;
   - the MySQL reader matching the plugin field-for-field on 1,000 products and every category;
@@ -17,7 +17,7 @@ Tested against WordPress 6.8.3 + WooCommerce 9.9.5 on MariaDB (PHP built-in serv
   - up-sells, cross-sells, brands, purchase note, "limit one per order" and reviews pushed and read back identically through the connector and direct MySQL.
 - **Unit tests:** 30 engine (cache, staging and undo, history, PHP serialization, signing, Local discovery, WordPress resize geometry, WebP pipeline, clone mapping) and 57 UI logic (formula engine, import planner, bulk edits, edit-panel mixed values and quick maths).
 - **Catalogue tests:** planning (exclusions at every level, pagination, contents page numbers, continuous flow and divider pages), text wrapping, and full PDF renders of every layout with a template, links, QR codes and bookmarks.
-- **UI end-to-end (34 steps):** grid edit and paste, undo, palette, drawer and live preview, paste cleanup, bulk edit, import with validation, variation matrix, diff panel, push, history revert, category drag-nesting, Local discovery, export, custom fields, new-product tabs, catalogue (leave out a category, change layout, cover and header text, load a template PDF, create the full PDF), category tick boxes for selected products (sub-category only, with parents, untick a parent), media range select, select all, delete with undo, pasting Google Docs text into bulk edit, push confirmation (No keeps changes staged, Yes pushes), Batch Builder (images matched and swapped, a second folder of same-named gallery images going one to each product, CSV export, batch added to the store, numbering continues), products in a category with tick boxes (sub-category products, tick, untick, add from the store), migration into an empty store (pre-flight, prepare, push, verify, re-run skips everything), grid dropdown cells (keyboard choice, apply to all ticked rows), the ▸ in front of a variable product's name, the edit panel (tick three products, Mixed values, +10% on all, stock status, add a tag to all, discard), docking it on the right, folding and Ctrl+E, the version badge, themes and close-button styles, bulk edit with three changes at once (one undo), auto-sync when the window gets focus again, the Select categories box (search, parent includes sub-categories, clear), saved views (new, rename, drag a column header, kept after reopening, delete), dark mode.
+- **UI end-to-end (36 steps):** the welcome screen (pick a store, enter; after saving your details it greets you by nickname and "Take me to settings" opens Settings), the push status colours, renaming a blank from the Opt menu, grid edit and paste, undo, palette, drawer and live preview, paste cleanup, bulk edit, import with validation, variation matrix, diff panel, push, history revert, category drag-nesting, Local discovery, export, custom fields, new-product tabs, catalogue (leave out a category, change layout, cover and header text, load a template PDF, create the full PDF), category tick boxes for selected products (sub-category only, with parents, untick a parent), media range select, select all, delete with undo, pasting Google Docs text into bulk edit, push confirmation (No keeps changes staged, Yes pushes), Batch Builder (images matched and swapped, a second folder of same-named gallery images going one to each product, CSV export, batch added to the store, numbering continues), products in a category with tick boxes (sub-category products, tick, untick, add from the store), migration into an empty store (pre-flight, prepare, push, verify, re-run skips everything), grid dropdown cells (keyboard choice, apply to all ticked rows), the ▸ in front of a variable product's name, the edit panel (tick three products, Mixed values, +10% on all, stock status, add a tag to all, discard), docking it on the right, folding and Ctrl+E, the version badge, themes and close-button styles, bulk edit with three changes at once (one undo), auto-sync when the window gets focus again, the Select categories box (search, parent includes sub-categories, clear), saved views (new, rename, drag a column header, kept after reopening, delete), dark mode.
 - **Real desktop app (Tauri on Linux):** loaded 6,695 products from the test store through the connector; switched to a Local site (MySQL pull and auto-provisioning); edited in the grid; pushed with ⌘S (verified in the database); live preview inside the app.
 
 Measured on the test machine (PHP built-in server, untuned MariaDB, so real hosting will differ):
@@ -28,10 +28,20 @@ Measured on the test machine (PHP built-in server, untuned MariaDB, so real host
 | Pull via connector | ~740 products/s |
 | Pull via direct MySQL / Local | ~5,800 products/s (6,695 products in 1.2 s) |
 
+## New in 0.6.0
+
+- **New name: StoreGenie Pro** (previously CatalogForge), with the new logo, window icon and favicon. The connector plugin is now **StoreGenie Pro Connector 0.4.0** (Tools → StoreGenie Pro in wp-admin).
+  - Behind the scenes the technical names stay as they were (the plugin's folder `catalogforge-connector`, its web address `/wp-json/catalogforge/v1`, saved keys and options, the app's data folder), so connected stores, keys, caches, staged edits and settings carry straight over. Updating the plugin in place (Upload → Replace current) keeps it connected.
+  - On Windows, the new installer installs "StoreGenie Pro" next to the old "CatalogForge"; once it runs, uninstall CatalogForge from Settings → Apps. Your stores and settings are kept because they're stored separately.
+- **Welcome screen** at launch: "Welcome back, {nickname}!", a box with your stores (the last one you used is picked), **Enter store** and **Take me to settings**. With no stores yet it offers **Add a store**.
+- **Settings → Your details:** name, alias/nickname, e-commerce store name and a picture (cropped to a circle and resized). The welcome screen uses them.
+- **Push status** (bottom left) is bolder and coloured: dark green "All changes pushed", amber "N records not pushed yet", red "N conflicts to sort out", or "Pushing changes…". Click it to open the list of changes.
+- **Batch Builder:** the small "⋯" box next to the blank is now an **Opt** button with Rename this blank, Save blank, Save as a new blank, New blank, Make a blank from a store product, Import, Export and Delete.
+
 ## New in 0.5.3
 
 - **Batch Builder: gallery images from a second folder.** Use **Gallery images…** (or drop them on that row) for a folder of gallery pictures named like the featured images (folder A/Xmas-01.webp and folder B/Xmas-01.webp). Each product gets only the gallery image with the same file name as its featured image (the extension may differ), or failing that the same number. They're never used as featured images. The row shows how many were matched and how many have no match or no free gallery slot (raise "gallery images per product" under Naming patterns if you have several per product). **Shared gallery images…** still adds the same picture, like a size chart, to every product.
-- **Auto-sync:** when you come back to CatalogForge (for example after changing something in WordPress), it checks the store for changes by itself, at most every 20 seconds, and only shows a message if something changed. Your unpushed edits are kept. Turn it off under Settings → Syncing.
+- **Auto-sync:** when you come back to StoreGenie Pro (for example after changing something in WordPress), it checks the store for changes by itself, at most every 20 seconds, and only shows a message if something changed. Your unpushed edits are kept. Turn it off under Settings → Syncing.
 - **Bulk edit: several changes at once.** **Add another change** adds as many changes as you like (e.g. price +10%, status, a tag). They run top to bottom, so a later change sees the earlier ones; the preview lists every field per product, and Apply stages them all as one undo step.
 
 ## New in 0.5.2
@@ -47,7 +57,7 @@ Measured on the test machine (PHP built-in server, untuned MariaDB, so real host
   - Changing columns saves into the open view. A built-in view you've changed shows "changed" with a button to put it back.
   - The column list in the menu can be dragged into a new order, with a line showing where the column will go.
 - **Move columns by dragging their header** in the grid. The column follows the mouse and the others slide aside to show where it will land; the new order is saved into the open view.
-- Views, column order and the open view are kept when you close CatalogForge. Export's "current view" uses them too.
+- Views, column order and the open view are kept when you close StoreGenie Pro. Export's "current view" uses them too.
 
 ## New in 0.5.0
 
@@ -68,7 +78,7 @@ Measured on the test machine (PHP built-in server, untuned MariaDB, so real host
   - Double-clicking the categories or a description cell opens that section of the edit panel.
 - **Close, cancel and discard buttons are red** everywhere (✕ on windows and panels, Cancel, Clear, Discard, Delete, No), so they're easy to find on a busy page. Three styles in Settings: red text, red outline (default) or soft red pill.
 - **Settings → Appearance:** six themes (Indigo by default, Ocean, Forest, Plum, Copper, Graphite) plus your own colour; Light, Dark or Match computer; close-button style; Comfortable or Compact rows; Square, Soft or Round corners; Small, Normal or Large text. **Reset to theme** undoes the rest.
-- **Version badge** next to CatalogForge in the sidebar; click it to open Settings.
+- **Version badge** next to StoreGenie Pro in the sidebar; click it to open Settings.
 
 ## New in 0.4.0
 
@@ -90,7 +100,7 @@ Measured on the test machine (PHP built-in server, untuned MariaDB, so real host
 
 ## New in 0.3.0
 
-- **Batch Builder** (sidebar → Batch Builder), the Product Batch Builder rebuilt inside CatalogForge:
+- **Batch Builder** (sidebar → Batch Builder), the Product Batch Builder rebuilt inside StoreGenie Pro:
   - **Blanks**: everything a collection shares, saved as you type. Make one from scratch, duplicate one, make one from **any product in your store** (prices, sizes, tags, descriptions and options are copied, prices in the text become `{price}`), import the old Store Manager CSV, or export/import all blanks as a file to use on another computer.
   - **Options → variable products**: add Size, Colour… with a price per option where it differs; every combination becomes a variation with its own SKU.
   - **Collections**: numbered (start, count, digits) or a list of names; category paths are picked from your store or typed (new levels are created); publish, draft or private; existing SKUs are left alone or updated.
@@ -109,7 +119,7 @@ Measured on the test machine (PHP built-in server, untuned MariaDB, so real host
 ## New in 0.2.1
 
 - **Category tick boxes.** Select products in the grid and every parent and sub-category in the sidebar gets a tick box: ticked (all selected products are in it), a dash (only some are) or empty. Tick to add, untick to remove, so a product put in the wrong category is fixed in one click. *Also tick parent categories* (off by default, remembered) decides whether ticking a sub-category adds its parents too; unticking only ever removes that one category, so products can sit in a parent, a sub-category, or both. The product editor's category list follows the same rules, lists the chosen categories as full paths you can remove, and marks parents that have a ticked sub-category.
-- **Media selection and bulk delete.** Click images to select them (Shift-click for a range), *Select all*, and *Delete selected*. Before deleting, CatalogForge shows which products and categories still use those images and takes the images off them in the same step, so nothing is left with a missing picture. Deletions are staged like any other change: review them, undo with ⌘Z, or Push to remove the files (and every resized copy) from the store. A *Not used* filter finds images no product or category uses.
+- **Media selection and bulk delete.** Click images to select them (Shift-click for a range), *Select all*, and *Delete selected*. Before deleting, StoreGenie Pro shows which products and categories still use those images and takes the images off them in the same step, so nothing is left with a missing picture. Deletions are staged like any other change: review them, undo with ⌘Z, or Push to remove the files (and every resized copy) from the store. A *Not used* filter finds images no product or category uses.
 - **Fixed:** clicking a row's tick box in the grid logged an error.
 
 ## New in 0.2.0

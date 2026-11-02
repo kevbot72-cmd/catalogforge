@@ -1,4 +1,4 @@
-import { ArrowRight, Download, Eye, FileArchive, Hash, ImagePlus, Layers, ListOrdered, Loader2, PackagePlus, Plus, Search, Sparkles, X } from "lucide-react";
+import { ArrowRight, ChevronDown, Copy, Download, Eye, FileArchive, FileUp, Hash, ImagePlus, Layers, ListOrdered, Loader2, PackagePlus, PackageSearch, Pencil, Plus, Save, Search, Sparkles, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { LocalFile, Product } from "../backend/types";
 import { BlankEditor, Fold } from "../components/batch/BlankEditor";
@@ -67,6 +67,85 @@ function Seg<T extends string>({ value, options, onChange, testId }: { value: T;
  * Batch Builder: a product blank × a design collection → dozens or hundreds of finished products,
  * with images matched automatically, checked against the store, and staged in one step.
  */
+/** The "Opt" menu next to the blank picker: rename, save, save as, new, import/export, delete. */
+function BlankMenu(p: {
+  label: string;
+  onRename: (name: string) => void;
+  onSave: () => void;
+  onSaveAs: (name: string) => void;
+  onNew: () => void;
+  onFromProduct: () => void;
+  onImport: () => void;
+  onExport: () => void;
+  onDelete: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [naming, setNaming] = useState<null | "rename" | "saveas">(null);
+  const [name, setName] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return setNaming(null);
+    const down = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
+    const key = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    window.addEventListener("mousedown", down);
+    window.addEventListener("keydown", key);
+    return () => {
+      window.removeEventListener("mousedown", down);
+      window.removeEventListener("keydown", key);
+    };
+  }, [open]);
+  const run = (f: () => void) => () => {
+    setOpen(false);
+    f();
+  };
+  const startNaming = (mode: "rename" | "saveas") => {
+    setName(mode === "rename" ? p.label : `${p.label} copy`);
+    setNaming(mode);
+  };
+  const finish = () => {
+    const n = name.trim();
+    if (!n) return;
+    if (naming === "rename") p.onRename(n);
+    else p.onSaveAs(n);
+    setOpen(false);
+  };
+  const item = "flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-[13px] hover:bg-sunken";
+  return (
+    <div className="relative" ref={ref}>
+      <Button size="sm" className="h-8" onClick={() => setOpen(!open)} aria-label="Blank options" aria-expanded={open} data-testid="blank-actions">
+        Opt <ChevronDown size={13} />
+      </Button>
+      {open && (
+        <div className="absolute right-0 z-40 mt-1 w-72 rounded-lg border border-line bg-panel p-1 shadow-xl" data-testid="blank-menu">
+          {naming ? (
+            <div className="space-y-2 p-2">
+              <div className="text-xs font-medium text-muted">{naming === "rename" ? "Rename this blank" : "Save as a new blank"}</div>
+              <Input autoFocus value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && finish()} data-testid="blank-name-input" aria-label="Blank name" />
+              <div className="flex justify-end gap-2">
+                <Button size="sm" variant="close" onClick={() => setNaming(null)}>Cancel</Button>
+                <Button size="sm" variant="primary" disabled={!name.trim()} onClick={finish} data-testid="blank-name-save">{naming === "rename" ? "Rename" : "Save"}</Button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <button className={item} onClick={() => startNaming("rename")} data-testid="blank-rename"><Pencil size={13} /> Rename this blank…</button>
+              <button className={item} onClick={run(p.onSave)} data-testid="blank-save"><Save size={13} /> Save blank</button>
+              <button className={item} onClick={() => startNaming("saveas")} data-testid="blank-save-as"><Copy size={13} /> Save as a new blank…</button>
+              <div className="my-1 border-t border-line" />
+              <button className={item} onClick={run(p.onNew)}><Plus size={13} /> New blank</button>
+              <button className={item} onClick={run(p.onFromProduct)}><PackageSearch size={13} /> Make a blank from a store product…</button>
+              <button className={item} onClick={run(p.onImport)}><FileUp size={13} /> Import blanks (.json) or a Store Manager CSV…</button>
+              <button className={item} onClick={run(p.onExport)}><Download size={13} /> Export all blanks (.json)…</button>
+              <div className="my-1 border-t border-line" />
+              <button className={clsx(item, "text-close hover:bg-close/10")} onClick={run(p.onDelete)}><Trash2 size={13} /> Delete this blank</button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function BatchBuilderView() {
   const { backend, storeId, info, taxonomy, create, stage, setQuery, setView, toast } = useApp();
   const symbol = info?.handshake?.currency_symbol ?? "$";
@@ -200,7 +279,7 @@ export function BatchBuilderView() {
   };
   const exportBlanks = async () => {
     const bytes = new TextEncoder().encode(JSON.stringify(blanks, null, 2));
-    const path = await backend.saveFile({ defaultName: "catalogforge-blanks.json", filterName: "Blanks", extension: "json", bytes, mime: "application/json" });
+    const path = await backend.saveFile({ defaultName: "storegenie-blanks.json", filterName: "Blanks", extension: "json", bytes, mime: "application/json" });
     if (path) toast({ tone: "success", title: `${blanks.length} blanks saved`, body: "Import them on another computer from the Blank menu." });
   };
 
@@ -321,31 +400,27 @@ export function BatchBuilderView() {
                   <Select value={blank.id} onChange={(e) => { setCurrentId(e.target.value); save("cf.batch.current", e.target.value); }} className="w-52" aria-label="Saved blank" data-testid="blank-select">
                     {blanks.map((b) => <option key={b.id} value={b.id}>{b.label || b.base || "Untitled blank"}</option>)}
                   </Select>
-                  <Select value="" className="w-10 px-1" aria-label="Blank actions" data-testid="blank-actions" onChange={async (e) => {
-                    const v = e.target.value;
-                    e.target.value = "";
-                    if (v === "new") addBlank(blankDefaults());
-                    else if (v === "dup") addBlank({ ...blank, id: blankDefaults().id, label: `${blank.label} copy` });
-                    else if (v === "product") setPicker(true);
-                    else if (v === "import") await importBlank();
-                    else if (v === "export") await exportBlanks();
-                    else if (v === "delete") {
+                  <BlankMenu
+                    label={blank.label || blank.base || "Untitled blank"}
+                    onRename={(label) => setBlank({ ...blank, label })}
+                    onSave={() => {
+                      save("cf.batch.blanks", blanks);
+                      toast({ tone: "success", title: `Blank “${blank.label || blank.base}” saved`, body: "Blanks also save as you type." });
+                    }}
+                    onSaveAs={(label) => addBlank({ ...blank, id: blankDefaults().id, label })}
+                    onNew={() => addBlank(blankDefaults())}
+                    onFromProduct={() => setPicker(true)}
+                    onImport={importBlank}
+                    onExport={exportBlanks}
+                    onDelete={() => {
                       if (blanks.length < 2) return toast({ tone: "info", title: "Keep at least one blank" });
                       if (!window.confirm(`Delete the blank “${blank.label}”?`)) return;
                       const rest = blanks.filter((b) => b.id !== blank.id);
                       setBlanks(rest);
                       save("cf.batch.blanks", rest);
                       setCurrentId(rest[0].id);
-                    }
-                  }}>
-                    <option value="">⋯</option>
-                    <option value="new">New blank</option>
-                    <option value="dup">Duplicate this blank</option>
-                    <option value="product">Make a blank from a store product…</option>
-                    <option value="import">Import blanks (.json) or a Store Manager CSV…</option>
-                    <option value="export">Export all blanks (.json)…</option>
-                    <option value="delete">Delete this blank</option>
-                  </Select>
+                    }}
+                  />
                 </div>
               }>
               <p className="text-xs text-muted">Everything that stays the same across a collection. Changes are saved as you type.</p>

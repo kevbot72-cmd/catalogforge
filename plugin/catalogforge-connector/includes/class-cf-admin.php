@@ -1,8 +1,8 @@
 <?php
 /**
- * Tools → CatalogForge: create and revoke connection keys.
+ * Tools → StoreGenie Pro: create and revoke connection keys.
  *
- * @package CatalogForge
+ * @package StoreGeniePro
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -16,7 +16,7 @@ class CF_Admin {
 	}
 
 	public static function menu() {
-		add_management_page( 'CatalogForge', 'CatalogForge', 'manage_woocommerce', 'catalogforge', array( __CLASS__, 'render' ) );
+		add_management_page( 'StoreGenie Pro', 'StoreGenie Pro', 'manage_woocommerce', 'catalogforge', array( __CLASS__, 'render' ) );
 	}
 
 	public static function create() {
@@ -47,8 +47,8 @@ class CF_Admin {
 		delete_transient( 'cf_new_key_' . get_current_user_id() );
 		?>
 		<div class="wrap">
-			<h1>CatalogForge Connector</h1>
-			<p>Create a connection key, then paste the connection string into <strong>CatalogForge → Add store → Connector plugin</strong>.</p>
+			<h1>StoreGenie Pro Connector</h1>
+			<p>Create a connection key, then paste the connection string into <strong>StoreGenie Pro → Add store → Connector plugin</strong>.</p>
 			<?php if ( $new ) : ?>
 				<div class="notice notice-success"><p><strong>Copy this connection string now. It will not be shown again.</strong></p>
 					<p><textarea readonly rows="3" style="width:100%;font-family:monospace" onclick="this.select()"><?php echo esc_textarea( $new ); ?></textarea></p></div>

@@ -1,4 +1,4 @@
-//! Driver for the CatalogForge Connector plugin.
+//! Driver for the StoreGenie Pro Connector plugin.
 
 use super::{Capabilities, Driver, MediaText};
 use crate::media::PreparedImage;
@@ -38,7 +38,7 @@ impl ConnectorDriver {
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(300))
             .connect_timeout(Duration::from_secs(15))
-            .user_agent(concat!("CatalogForge/", env!("CARGO_PKG_VERSION")))
+            .user_agent(concat!("StoreGeniePro/", env!("CARGO_PKG_VERSION")))
             .gzip(true)
             .build()?;
         Ok(Self {
@@ -59,7 +59,7 @@ impl ConnectorDriver {
             .no_proxy()
             .danger_accept_invalid_certs(true)
             .timeout(Duration::from_secs(300))
-            .user_agent(concat!("CatalogForge/", env!("CARGO_PKG_VERSION")))
+            .user_agent(concat!("StoreGeniePro/", env!("CARGO_PKG_VERSION")))
             .gzip(true)
             .build()?;
         d.host_override = host_override;
@@ -145,7 +145,7 @@ impl ConnectorDriver {
                     .and_then(|v| v.get("message").and_then(|m| m.as_str()).map(String::from))
                     .unwrap_or_else(|| text.chars().take(300).collect());
                 if status == StatusCode::NOT_FOUND && msg.contains("No route") {
-                    bail!("The CatalogForge Connector plugin is not active on this store.");
+                    bail!("The StoreGenie Pro Connector plugin is not active on this store.");
                 }
                 bail!("Store returned {status}: {msg}");
             }
@@ -322,7 +322,7 @@ impl Driver for ConnectorDriver {
             #[serde(default)]
             acf_labels: std::collections::HashMap<String, String>,
         }
-        let r: R = self.get("/meta-keys", &[]).await.map_err(|e| anyhow!("{e}. Update the CatalogForge Connector plugin to 0.2 or later to use custom fields."))?;
+        let r: R = self.get("/meta-keys", &[]).await.map_err(|e| anyhow!("{e}. Update the StoreGenie Pro Connector plugin to 0.2 or later to use custom fields."))?;
         Ok(crate::custom_fields::summarize(r.keys, &r.acf_labels))
     }
 }

@@ -681,8 +681,8 @@ export async function renderCatalogue(input: RenderInput): Promise<Uint8Array> {
   doc.setTitle(title, { showInWindowTitleBar: true });
   doc.setAuthor(meta.store);
   doc.setSubject(`${plan.productCount} products`);
-  doc.setCreator("CatalogForge");
-  doc.setProducer("CatalogForge");
+  doc.setCreator("StoreGenie Pro");
+  doc.setProducer("StoreGenie Pro");
   doc.setKeywords(plan.toc.filter((t) => t.depth === 0).map((t) => t.node.name));
   progress(plan.pages.length, plan.pages.length, "Saving PDF");
   return doc.save({ useObjectStreams: true });

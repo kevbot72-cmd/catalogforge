@@ -114,7 +114,7 @@ export function AddStoreDialog() {
           </div>
         )}
         {kind === "connector" && (
-          <Field label="Connection string" hint={<>In wp-admin: install <b>CatalogForge Connector</b>, then Tools → CatalogForge → Create connection key. Paste the <code>cf1.…</code> string here. It is stored in your OS keychain.</>}>
+          <Field label="Connection string" hint={<>In wp-admin: install <b>StoreGenie Pro Connector</b>, then Tools → StoreGenie Pro → Create connection key. Paste the <code>cf1.…</code> string here. It is stored in your OS keychain.</>}>
             <TextArea rows={3} value={conn} onChange={(e) => setConn(e.target.value)} placeholder="cf1.eyJ2Ijox…" className="font-mono text-xs" data-testid="connection-string" />
           </Field>
         )}
