@@ -106,7 +106,7 @@ describe("catalogue rendering", () => {
       fontLoader,
       onProgress: (_, __, m) => progress.push(m),
     });
-    if (process.env.CF_CATALOGUE_OUT) writeFileSync(process.env.CF_CATALOGUE_OUT, bytes);
+    if (process.env.SG_CATALOGUE_OUT) writeFileSync(process.env.SG_CATALOGUE_OUT, bytes);
     const out = await PDFDocument.load(bytes);
     expect(out.getPageCount()).toBe(plan.pages.length);
     expect(out.getTitle()).toBe("Northwind");
@@ -120,7 +120,7 @@ describe("catalogue rendering", () => {
     const d: CatalogueDesign = { ...(layout === "list" ? THEMES.Boutique(defaultDesign()) : defaultDesign()), layout, columns: 2, rows: 4, azIndex: false, backCover: false, header: { ...defaultDesign().header, style: { ...defaultDesign().header.style, font: "Helvetica" } } };
     const plan = paginate(buildTree(cats, products, d), d, geometry(d));
     const bytes = await renderCatalogue({ design: d, plan, meta: { store: "S", website: "", currencySymbol: "$", decimals: 2 }, customLabels: {}, image: async () => null, readFile: async () => new Uint8Array(), fontLoader });
-    if (process.env.CF_CATALOGUE_OUT) writeFileSync(process.env.CF_CATALOGUE_OUT.replace(".pdf", `-${layout}.pdf`), bytes);
+    if (process.env.SG_CATALOGUE_OUT) writeFileSync(process.env.SG_CATALOGUE_OUT.replace(".pdf", `-${layout}.pdf`), bytes);
     expect((await PDFDocument.load(bytes)).getPageCount()).toBe(plan.pages.length);
   }, 60000);
 });

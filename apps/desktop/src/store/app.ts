@@ -27,7 +27,7 @@ const DEFAULT_PANEL: PanelPrefs = { open: true, dock: "bottom", bottomSize: 340,
 
 function loadPanel(): PanelPrefs {
   try {
-    return { ...DEFAULT_PANEL, ...JSON.parse(localStorage.getItem("cf.panel") ?? "{}") };
+    return { ...DEFAULT_PANEL, ...JSON.parse(localStorage.getItem("sg.panel") ?? "{}") };
   } catch {
     return DEFAULT_PANEL;
   }
@@ -125,7 +125,7 @@ export const useApp = create<AppState>((set, get) => ({
   toasts: [],
   catWithParents: (() => {
     try {
-      return localStorage.getItem("cf.cat.withParents") === "1";
+      return localStorage.getItem("sg.cat.withParents") === "1";
     } catch {
       return false;
     }
@@ -133,7 +133,7 @@ export const useApp = create<AppState>((set, get) => ({
   dark: false,
   autoSync: (() => {
     try {
-      return localStorage.getItem("cf.autoSync") !== "0";
+      return localStorage.getItem("sg.autoSync") !== "0";
     } catch {
       return true;
     }
@@ -176,7 +176,7 @@ export const useApp = create<AppState>((set, get) => ({
     const { backend } = get();
     set({ storeId: id, busy: "Opening store", info: null, taxonomy: null, selection: [], focusKey: null, drawerKey: null, query: { sort: [{ field: "id", desc: true }], expanded: [] } });
     try {
-      localStorage.setItem("cf.store", id);
+      localStorage.setItem("sg.store", id);
     } catch {
       /* ignore */
     }
@@ -275,7 +275,7 @@ export const useApp = create<AppState>((set, get) => ({
   },
   setAutoSync(v) {
     try {
-      localStorage.setItem("cf.autoSync", v ? "1" : "0");
+      localStorage.setItem("sg.autoSync", v ? "1" : "0");
     } catch {
       /* preference only */
     }
@@ -321,7 +321,7 @@ export const useApp = create<AppState>((set, get) => ({
   dismissToast: (id) => set({ toasts: get().toasts.filter((t) => t.id !== id) }),
   setCatWithParents(v) {
     try {
-      localStorage.setItem("cf.cat.withParents", v ? "1" : "0");
+      localStorage.setItem("sg.cat.withParents", v ? "1" : "0");
     } catch {
       /* preference only */
     }
@@ -339,7 +339,7 @@ export const useApp = create<AppState>((set, get) => ({
   setPanel(patch) {
     const panel = { ...get().panel, ...patch };
     try {
-      localStorage.setItem("cf.panel", JSON.stringify(panel));
+      localStorage.setItem("sg.panel", JSON.stringify(panel));
     } catch {
       /* preference only */
     }

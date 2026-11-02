@@ -34,12 +34,12 @@ It replaces the workflow of tools like eMagicOne Store Manager with a modern, cr
 ## Repository layout
 
 ```
-crates/forge-core/        Rust engine: drivers, SQLite cache + staging, sync, media pipeline
+crates/storegenie-core/        Rust engine: drivers, SQLite cache + staging, sync, media pipeline
 apps/desktop/             Tauri v2 desktop app (React + TypeScript UI)
   src/                    UI, formula engine, import pipeline, demo backend
   src-tauri/              Rust command layer (bundles the connector plugin)
   e2e/run.mjs             End-to-end UI test (Playwright)
-plugin/catalogforge-connector/   WordPress plugin installed on the store
+plugin/storegenie-connector/   WordPress plugin installed on the store
 plugin/tests/smoke.php    Plugin end-to-end test against a real store
 docs/                     Architecture, connector protocol, roadmap
 ```
@@ -60,22 +60,22 @@ To try the UI without any store, run `npm run dev` and open http://localhost:142
 ### Connecting stores
 
 - **Local (Flywheel):** *Add store → Local*. Running sites are listed automatically. Pick one and the app connects to its database, installs and activates the connector plugin, and creates its own access key. Nothing to copy or paste.
-- **Live store (recommended):** install `plugin/catalogforge-connector` (zip the folder and upload it in *Plugins → Add New → Upload*). Then go to *Tools → StoreGenie Pro → Create connection key* and paste the `cf1.…` string into *Add store → Connector plugin*. Secrets are stored in the OS keychain.
+- **Live store (recommended):** install `plugin/storegenie-connector` (zip the folder and upload it in *Plugins → Add New → Upload*). Then go to *Tools → StoreGenie Pro → Create connection key* and paste the `sg1.…` string into *Add store → Connector plugin*. Secrets are stored in the OS keychain.
 - **REST API:** WooCommerce → Settings → Advanced → REST API → add a key with Read/Write access, then enter the URL, key and secret.
 - **Direct MySQL:** database host, port, credentials and table prefix. Add a connector string to enable writes; without one the connection is read-only by design.
 
 ## Tests
 
 ```bash
-cargo test -p forge-core --lib                  # engine unit tests
+cargo test -p storegenie-core --lib                  # engine unit tests
 cd apps/desktop && npm test                      # formula, import and bulk-edit tests
 npm run build && npx vite preview --port 4173 &  # then:
 npm run e2e                                      # 36-step UI test on demo data
 
 # Against a real WordPress + WooCommerce with the plugin active:
 php plugin/tests/smoke.php https://store.test KEY SECRET
-CF_TEST_URL=… CF_TEST_KEY=… CF_TEST_SECRET=… CF_TEST_WP_ROOT=… \
-  cargo test -p forge-core --test live_store -- --test-threads=1 --nocapture
+SG_TEST_URL=… SG_TEST_KEY=… SG_TEST_SECRET=… SG_TEST_WP_ROOT=… \
+  cargo test -p storegenie-core --test live_store -- --test-threads=1 --nocapture
 ```
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how it works, [docs/PROTOCOL.md](docs/PROTOCOL.md) for the connector API, and [docs/ROADMAP.md](docs/ROADMAP.md) for verified results, known limitations and what's next.

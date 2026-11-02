@@ -19,7 +19,9 @@ use sqlx::Row;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-pub const PLUGIN_FILE: &str = "catalogforge-connector/catalogforge-connector.php";
+pub const PLUGIN_FILE: &str = "storegenie-connector/storegenie-connector.php";
+/// The plugin before its rename (CatalogForge Connector); switched off when the new one is installed.
+pub const LEGACY_PLUGIN_FILE: &str = "catalogforge-connector/catalogforge-connector.php";
 
 /// Credentials the app keeps for a provisioned Local site.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -103,8 +105,11 @@ impl LocalDriver {
 async fn activate_plugin(db: &MysqlDriver) -> Result<()> {
     let raw = db.option("active_plugins").await?.unwrap_or_default();
     let mut list = phpser::parse_string_list(&raw).context("Reading active_plugins")?;
-    if !list.iter().any(|p| p == PLUGIN_FILE) {
-        list.push(PLUGIN_FILE.to_string());
+    if !list.iter().any(|p| p == PLUGIN_FILE) || list.iter().any(|p| p == LEGACY_PLUGIN_FILE) {
+        list.retain(|p| p != LEGACY_PLUGIN_FILE);
+        if !list.iter().any(|p| p == PLUGIN_FILE) {
+            list.push(PLUGIN_FILE.to_string());
+        }
         list.sort();
         db.set_option("active_plugins", &phpser::serialize_string_list(&list), true).await?;
     }
@@ -112,10 +117,19 @@ async fn activate_plugin(db: &MysqlDriver) -> Result<()> {
 }
 
 async fn ensure_key(db: &MysqlDriver, known: Option<LocalKey>) -> Result<LocalKey> {
-    let raw = db.option("catalogforge_keys").await?.unwrap_or_else(|| "{}".into());
+    let raw = db.option("storegenie_keys").await?.unwrap_or_else(|| "{}".into());
     let mut keys: serde_json::Map<String, serde_json::Value> = serde_json::from_str(&raw).unwrap_or_default();
+    // Keys made by the plugin under its old name still count (the new plugin carries them over too).
+    let legacy: serde_json::Map<String, serde_json::Value> = serde_json::from_str(&db.option("catalogforge_keys").await?.unwrap_or_default()).unwrap_or_default();
+    let had_legacy = legacy.keys().any(|k| !keys.contains_key(k));
+    for (k, v) in legacy {
+        keys.entry(k).or_insert(v);
+    }
     if let Some(k) = known {
         if keys.get(&k.key).and_then(|v| v.get("secret")).and_then(|s| s.as_str()) == Some(k.secret.as_str()) {
+            if had_legacy {
+                db.set_option("storegenie_keys", &serde_json::Value::Object(keys).to_string(), false).await?;
+            }
             return Ok(k);
         }
     }
@@ -128,12 +142,12 @@ async fn ensure_key(db: &MysqlDriver, known: Option<LocalKey>) -> Result<LocalKe
     .await?
     .map(|r| r.get::<u64, _>(0));
     let admin = admin.context("No administrator account found in this site")?;
-    let key = LocalKey { key: format!("cf_local_{}", &uuid::Uuid::new_v4().simple().to_string()[..12]), secret: hex::encode(rand::random::<[u8; 32]>()) };
+    let key = LocalKey { key: format!("sg_local_{}", &uuid::Uuid::new_v4().simple().to_string()[..12]), secret: hex::encode(rand::random::<[u8; 32]>()) };
     keys.insert(
         key.key.clone(),
         serde_json::json!({ "secret": key.secret, "user_id": admin, "label": "StoreGenie Pro (Local)", "created": chrono::Utc::now().timestamp() }),
     );
-    db.set_option("catalogforge_keys", &serde_json::Value::Object(keys).to_string(), false).await?;
+    db.set_option("storegenie_keys", &serde_json::Value::Object(keys).to_string(), false).await?;
     Ok(key)
 }
 
@@ -190,5 +204,5 @@ impl Driver for LocalDriver {
 
 /// Location of the connector plugin bundled with the app.
 pub fn bundled_plugin_dir(resource_dir: &Path) -> PathBuf {
-    resource_dir.join("catalogforge-connector")
+    resource_dir.join("storegenie-connector")
 }

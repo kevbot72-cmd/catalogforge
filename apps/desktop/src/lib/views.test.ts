@@ -15,8 +15,8 @@ beforeEach(() => {
 
 describe("saved views", () => {
   it("brings the old single Custom view over as a named view", () => {
-    store.set("cf.columns", JSON.stringify(["name", "sku"]));
-    store.set("cf.preset", "Custom");
+    store.set("sg.columns", JSON.stringify(["name", "sku"]));
+    store.set("sg.preset", "Custom");
     const s = loadViews(BUILT);
     expect(viewName(s)).toBe("Custom");
     expect(viewColumns(s, BUILT)).toEqual(["name", "sku"]);

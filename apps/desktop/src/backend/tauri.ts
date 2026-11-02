@@ -21,7 +21,7 @@ function installDropBridge() {
       const y = e.payload.position.y / ratio;
       const files = (await invoke<FileInfo[]>("scan_paths", { paths: e.payload.paths })).map(toLocal);
       const target = document.elementFromPoint(x, y)?.closest("[data-dropzone]") ?? document.body;
-      target.dispatchEvent(new CustomEvent("cf-native-drop", { bubbles: true, detail: { files, paths: e.payload.paths } }));
+      target.dispatchEvent(new CustomEvent("sg-native-drop", { bubbles: true, detail: { files, paths: e.payload.paths } }));
     })
     .catch(() => {});
 }
@@ -71,7 +71,7 @@ export function createTauriBackend(): Backend {
       return path;
     },
     async filesFromDrop(files) {
-      // Native drops arrive through the cf-native-drop bridge; HTML5 File objects have no path here.
+      // Native drops arrive through the sg-native-drop bridge; HTML5 File objects have no path here.
       return files.map((f) => ({ path: (f as File & { path?: string }).path ?? f.name, name: f.name, url: URL.createObjectURL(f), size: f.size }));
     },
     async resolveImagePaths(paths) {

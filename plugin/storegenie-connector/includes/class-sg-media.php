@@ -6,7 +6,7 @@
  *   register  – files were already written into wp-content/uploads by the app (Local sites, SFTP);
  *               the plugin only registers the attachment and its pre-computed size metadata.
  *   upload    – the app sends the optimized original plus every registered sub-size it already
- *               generated, as one binary body described by the X-CF-Manifest header. The server
+ *               generated, as one binary body described by the X-SG-Manifest header. The server
  *               does no image processing at all.
  *   sideload  – the server downloads a remote URL and lets WordPress generate sizes (fallback).
  *
@@ -17,7 +17,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-class CF_Media {
+class SG_Media {
 
 	const ALLOWED = array(
 		'image/jpeg' => array( 'jpg', 'jpeg' ),
@@ -35,7 +35,7 @@ class CF_Media {
 		return (int) $wpdb->get_var(
 			$wpdb->prepare(
 				"SELECT pm.post_id FROM {$wpdb->postmeta} pm INNER JOIN {$wpdb->posts} p ON p.ID = pm.post_id
-				 WHERE pm.meta_key = '_cf_sha256' AND pm.meta_value = %s AND p.post_type = 'attachment' LIMIT 1",
+				 WHERE pm.meta_key = '_sg_sha256' AND pm.meta_value = %s AND p.post_type = 'attachment' LIMIT 1",
 				$sha
 			)
 		);
@@ -57,14 +57,14 @@ class CF_Media {
 	 * @param WP_REST_Request $request Request.
 	 */
 	public static function upload( $request ) {
-		$manifest = self::decode_manifest( $request->get_header( 'x_cf_manifest' ) );
+		$manifest = self::decode_manifest( SG_Auth::header( $request, 'manifest' ) );
 		if ( ! $manifest || empty( $manifest['parts'] ) ) {
-			return new WP_Error( 'cf_manifest', 'Missing or invalid X-CF-Manifest.', array( 'status' => 400 ) );
+			return new WP_Error( 'sg_manifest', 'Missing or invalid X-SG-Manifest.', array( 'status' => 400 ) );
 		}
 		$sha = strtolower( (string) ( $manifest['sha256'] ?? '' ) );
 		if ( $existing = self::find_by_sha( $sha ) ) {
 			self::apply_text( $existing, $manifest, false );
-			return array( 'deduplicated' => true, 'media' => CF_Serializer::media( $existing ) );
+			return array( 'deduplicated' => true, 'media' => SG_Serializer::media( $existing ) );
 		}
 
 		$body  = (string) $request->get_body();
@@ -73,11 +73,11 @@ class CF_Media {
 			$offset = (int) ( $part['offset'] ?? -1 );
 			$length = (int) ( $part['length'] ?? -1 );
 			if ( $offset < 0 || $length <= 0 || $offset + $length > strlen( $body ) ) {
-				return new WP_Error( 'cf_part', 'Manifest part out of bounds.', array( 'status' => 400 ) );
+				return new WP_Error( 'sg_part', 'Manifest part out of bounds.', array( 'status' => 400 ) );
 			}
 			$mime = (string) ( $part['mime'] ?? $manifest['mime'] ?? '' );
 			if ( ! self::ext_for_mime( $mime ) ) {
-				return new WP_Error( 'cf_mime', "Unsupported image type {$mime}.", array( 'status' => 415 ) );
+				return new WP_Error( 'sg_mime', "Unsupported image type {$mime}.", array( 'status' => 415 ) );
 			}
 			$parts[ (string) $part['name'] ] = array(
 				'bytes'  => substr( $body, $offset, $length ),
@@ -87,15 +87,15 @@ class CF_Media {
 			);
 		}
 		if ( empty( $parts['full'] ) ) {
-			return new WP_Error( 'cf_part', 'Manifest must include a "full" part.', array( 'status' => 400 ) );
+			return new WP_Error( 'sg_part', 'Manifest must include a "full" part.', array( 'status' => 400 ) );
 		}
 		if ( $sha && hash( 'sha256', $parts['full']['bytes'] ) !== $sha ) {
-			return new WP_Error( 'cf_integrity', 'Checksum mismatch for the uploaded original.', array( 'status' => 422 ) );
+			return new WP_Error( 'sg_integrity', 'Checksum mismatch for the uploaded original.', array( 'status' => 422 ) );
 		}
 
 		$uploads = wp_upload_dir( null, true );
 		if ( ! empty( $uploads['error'] ) ) {
-			return new WP_Error( 'cf_uploads', $uploads['error'], array( 'status' => 500 ) );
+			return new WP_Error( 'sg_uploads', $uploads['error'], array( 'status' => 500 ) );
 		}
 		$ext      = self::ext_for_mime( $parts['full']['mime'] );
 		$base     = sanitize_file_name( pathinfo( (string) ( $manifest['filename'] ?? 'image' ), PATHINFO_FILENAME ) );
@@ -106,13 +106,13 @@ class CF_Media {
 		$relative = self::relative( ltrim( (string) $uploads['subdir'], '/\\' ) . '/' . $filename );
 
 		if ( false === file_put_contents( $full, $parts['full']['bytes'] ) ) {
-			return new WP_Error( 'cf_write', 'Could not write to the uploads directory.', array( 'status' => 500 ) );
+			return new WP_Error( 'sg_write', 'Could not write to the uploads directory.', array( 'status' => 500 ) );
 		}
 		// Verify the bytes really are the claimed image type.
 		$check = wp_check_filetype_and_ext( $full, $filename );
 		if ( empty( $check['type'] ) || ! isset( self::ALLOWED[ $check['type'] ] ) ) {
 			wp_delete_file( $full );
-			return new WP_Error( 'cf_mime', 'File content is not an allowed image.', array( 'status' => 415 ) );
+			return new WP_Error( 'sg_mime', 'File content is not an allowed image.', array( 'status' => 415 ) );
 		}
 
 		$sizes = array();
@@ -152,9 +152,9 @@ class CF_Media {
 			wp_update_attachment_metadata( $id, wp_generate_attachment_metadata( $id, $full ) );
 		}
 		if ( $sha ) {
-			update_post_meta( $id, '_cf_sha256', $sha );
+			update_post_meta( $id, '_sg_sha256', $sha );
 		}
-		return array( 'deduplicated' => false, 'media' => CF_Serializer::media( $id ) );
+		return array( 'deduplicated' => false, 'media' => SG_Serializer::media( $id ) );
 	}
 
 	/**
@@ -163,10 +163,10 @@ class CF_Media {
 	 * @param WP_REST_Request $request Request.
 	 */
 	public static function register( $request ) {
-		$data = CF_Auth::json_body( $request );
+		$data = SG_Auth::json_body( $request );
 		$sha  = strtolower( (string) ( $data['sha256'] ?? '' ) );
 		if ( $existing = self::find_by_sha( $sha ) ) {
-			return array( 'deduplicated' => true, 'media' => CF_Serializer::media( $existing ) );
+			return array( 'deduplicated' => true, 'media' => SG_Serializer::media( $existing ) );
 		}
 		$uploads  = wp_upload_dir( null, false );
 		$relative = self::relative( (string) ( $data['relative_path'] ?? '' ) );
@@ -177,12 +177,12 @@ class CF_Media {
 		$basedir = realpath( $uploads['basedir'] );
 		$real    = realpath( trailingslashit( $uploads['basedir'] ) . $relative );
 		if ( '' === $relative || ! $basedir || ! $real || 0 !== strpos( $real, $basedir . DIRECTORY_SEPARATOR ) || ! is_file( $real ) ) {
-			return new WP_Error( 'cf_path', 'File not found inside the uploads directory.', array( 'status' => 404 ) );
+			return new WP_Error( 'sg_path', 'File not found inside the uploads directory.', array( 'status' => 404 ) );
 		}
 		$full = trailingslashit( $uploads['basedir'] ) . $relative;
 		$check = wp_check_filetype_and_ext( $full, basename( $full ) );
 		if ( empty( $check['type'] ) || ! isset( self::ALLOWED[ $check['type'] ] ) ) {
-			return new WP_Error( 'cf_mime', 'File is not an allowed image.', array( 'status' => 415 ) );
+			return new WP_Error( 'sg_mime', 'File is not an allowed image.', array( 'status' => 415 ) );
 		}
 		$dir   = dirname( $real );
 		$sizes = array();
@@ -220,9 +220,9 @@ class CF_Media {
 			wp_update_attachment_metadata( $id, wp_generate_attachment_metadata( $id, $full ) );
 		}
 		if ( $sha ) {
-			update_post_meta( $id, '_cf_sha256', $sha );
+			update_post_meta( $id, '_sg_sha256', $sha );
 		}
-		return array( 'deduplicated' => false, 'media' => CF_Serializer::media( $id ) );
+		return array( 'deduplicated' => false, 'media' => SG_Serializer::media( $id ) );
 	}
 
 	/**
@@ -232,14 +232,14 @@ class CF_Media {
 	 */
 	public static function sideload( $request ) {
 		global $wpdb;
-		$data = CF_Auth::json_body( $request );
+		$data = SG_Auth::json_body( $request );
 		$url  = esc_url_raw( (string) ( $data['url'] ?? '' ) );
 		if ( ! $url || ! wp_http_validate_url( $url ) ) {
-			return new WP_Error( 'cf_url', 'A public http(s) URL is required.', array( 'status' => 400 ) );
+			return new WP_Error( 'sg_url', 'A public http(s) URL is required.', array( 'status' => 400 ) );
 		}
-		$existing = (int) $wpdb->get_var( $wpdb->prepare( "SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = '_cf_source_url' AND meta_value = %s LIMIT 1", $url ) );
+		$existing = (int) $wpdb->get_var( $wpdb->prepare( "SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = '_sg_source_url' AND meta_value = %s LIMIT 1", $url ) );
 		if ( $existing && 'attachment' === get_post_type( $existing ) ) {
-			return array( 'deduplicated' => true, 'media' => CF_Serializer::media( $existing ) );
+			return array( 'deduplicated' => true, 'media' => SG_Serializer::media( $existing ) );
 		}
 		require_once ABSPATH . 'wp-admin/includes/file.php';
 		require_once ABSPATH . 'wp-admin/includes/media.php';
@@ -251,8 +251,8 @@ class CF_Media {
 		$sha = hash_file( 'sha256', $tmp );
 		if ( $dupe = self::find_by_sha( $sha ) ) {
 			wp_delete_file( $tmp );
-			update_post_meta( $dupe, '_cf_source_url', $url );
-			return array( 'deduplicated' => true, 'media' => CF_Serializer::media( $dupe ) );
+			update_post_meta( $dupe, '_sg_source_url', $url );
+			return array( 'deduplicated' => true, 'media' => SG_Serializer::media( $dupe ) );
 		}
 		$name = ! empty( $data['filename'] ) ? sanitize_file_name( $data['filename'] ) : wp_basename( wp_parse_url( $url, PHP_URL_PATH ) );
 		$id   = media_handle_sideload( array( 'name' => $name, 'tmp_name' => $tmp ), (int) ( $data['parent_id'] ?? 0 ), $data['title'] ?? null );
@@ -260,10 +260,10 @@ class CF_Media {
 			wp_delete_file( $tmp );
 			return $id;
 		}
-		update_post_meta( $id, '_cf_sha256', $sha );
-		update_post_meta( $id, '_cf_source_url', $url );
+		update_post_meta( $id, '_sg_sha256', $sha );
+		update_post_meta( $id, '_sg_source_url', $url );
 		self::apply_text( $id, $data, true );
-		return array( 'deduplicated' => false, 'media' => CF_Serializer::media( $id ) );
+		return array( 'deduplicated' => false, 'media' => SG_Serializer::media( $id ) );
 	}
 
 	/** Uploads-relative path with forward slashes and no traversal segments. */
@@ -310,7 +310,7 @@ class CF_Media {
 		global $wpdb;
 		$rows = $wpdb->get_results(
 			"SELECT f.post_id, f.meta_value FROM {$wpdb->postmeta} f
-			 INNER JOIN {$wpdb->postmeta} s ON s.post_id = f.post_id AND s.meta_key = '_cf_sha256'
+			 INNER JOIN {$wpdb->postmeta} s ON s.post_id = f.post_id AND s.meta_key = '_sg_sha256'
 			 WHERE f.meta_key = '_wp_attached_file' AND (f.meta_value LIKE '/%' OR f.meta_value LIKE '_:%')"
 		);
 		if ( ! $rows ) {
@@ -359,11 +359,11 @@ class CF_Media {
 
 	/** Runs one-time data upgrades when the plugin version changes. */
 	public static function maybe_upgrade() {
-		if ( (int) get_option( 'catalogforge_schema', 1 ) >= 2 ) {
+		if ( (int) get_option( 'storegenie_schema', 1 ) >= 2 ) {
 			return;
 		}
 		self::repair_paths();
-		update_option( 'catalogforge_schema', 2, true );
+		update_option( 'storegenie_schema', 2, true );
 	}
 
 	private static function apply_text( $id, array $data, $with_title ) {
@@ -404,7 +404,7 @@ class CF_Media {
 		$q     = new WP_Query( $args );
 		$items = array();
 		foreach ( $q->posts as $id ) {
-			$m = CF_Serializer::media( $id );
+			$m = SG_Serializer::media( $id );
 			if ( $m ) {
 				$items[] = $m;
 			}

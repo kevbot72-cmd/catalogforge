@@ -124,7 +124,7 @@ export function ProductGrid({ columns, onColumnMoved }: { columns: ColumnDef[]; 
   const [dataVersion, setTick] = useState(0);
   const [widths, setWidths] = useState<Record<string, number>>(() => {
     try {
-      return JSON.parse(localStorage.getItem("cf.widths") ?? "{}");
+      return JSON.parse(localStorage.getItem("sg.widths") ?? "{}");
     } catch {
       return {};
     }
@@ -439,7 +439,7 @@ export function ProductGrid({ columns, onColumnMoved }: { columns: ColumnDef[]; 
           const next = { ...widths, [col.id as string]: w };
           setWidths(next);
           try {
-            localStorage.setItem("cf.widths", JSON.stringify(next));
+            localStorage.setItem("sg.widths", JSON.stringify(next));
           } catch {
             /* ignore */
           }

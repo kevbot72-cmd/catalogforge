@@ -19,7 +19,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLBut
         variant === "secondary" && "border border-line bg-panel hover:bg-sunken",
         variant === "ghost" && "text-muted hover:bg-sunken hover:text-fg",
         variant === "danger" && "bg-removed text-white hover:bg-removed/90",
-        variant === "close" && "cf-close",
+        variant === "close" && "sg-close",
         className,
       )}
       {...rest}
@@ -33,7 +33,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLBut
 /** The ✕ that closes a window or panel, in the close-button style so it is easy to spot. */
 export function CloseX({ onClick, label = "Close", size = 15, className, testId }: { onClick: () => void; label?: string; size?: number; className?: string; testId?: string }) {
   return (
-    <button type="button" onClick={onClick} className={clsx("cf-close inline-flex h-7 min-w-7 items-center justify-center rounded-md px-1.5", className)} aria-label={label} title={label} data-testid={testId}>
+    <button type="button" onClick={onClick} className={clsx("sg-close inline-flex h-7 min-w-7 items-center justify-center rounded-md px-1.5", className)} aria-label={label} title={label} data-testid={testId}>
       <X size={size} />
     </button>
   );
@@ -142,7 +142,7 @@ export function ProgressBar({ value, total, className }: { value: number; total:
   const pct = total > 0 ? Math.min(100, (value / total) * 100) : 0;
   return (
     <div className={clsx("h-1.5 w-full overflow-hidden rounded-full bg-sunken", className)}>
-      {total > 0 ? <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${pct}%` }} /> : <div className="cf-indeterminate h-full w-1/3 rounded-full bg-accent" />}
+      {total > 0 ? <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${pct}%` }} /> : <div className="sg-indeterminate h-full w-1/3 rounded-full bg-accent" />}
     </div>
   );
 }
@@ -165,8 +165,8 @@ export function Dropzone({ onFiles, toFiles, children, className, activeClassNam
       e.stopPropagation();
       onFiles((e as CustomEvent).detail.files, []);
     };
-    el.addEventListener("cf-native-drop", h);
-    return () => el.removeEventListener("cf-native-drop", h);
+    el.addEventListener("sg-native-drop", h);
+    return () => el.removeEventListener("sg-native-drop", h);
   }, [onFiles]);
   return (
     <div

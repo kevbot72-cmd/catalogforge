@@ -11,7 +11,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-class CF_Preview {
+class SG_Preview {
 
 	const TTL = 900;
 
@@ -20,17 +20,17 @@ class CF_Preview {
 	private static $target = 0;
 
 	public static function create( $request ) {
-		$body = CF_Auth::json_body( $request );
+		$body = SG_Auth::json_body( $request );
 		$id   = (int) ( $body['product_id'] ?? 0 );
 		if ( $id && ! wc_get_product( $id ) ) {
-			return new WP_Error( 'cf_missing', 'Product not found.', array( 'status' => 404 ) );
+			return new WP_Error( 'sg_missing', 'Product not found.', array( 'status' => 404 ) );
 		}
 		if ( ! $id ) {
 			$id = self::placeholder_id();
 		}
 		$token = wp_generate_password( 32, false, false );
 		set_transient(
-			'cf_pv_' . $token,
+			'sg_pv_' . $token,
 			array(
 				'product_id' => $id,
 				'data'       => (array) ( $body['data'] ?? array() ),
@@ -41,7 +41,7 @@ class CF_Preview {
 			array(
 				'post_type'  => 'product',
 				'p'          => $id,
-				'cf_preview' => $token,
+				'sg_preview' => $token,
 			),
 			home_url( '/' )
 		);
@@ -52,7 +52,7 @@ class CF_Preview {
 	 * A hidden draft product used to preview products that do not exist yet.
 	 */
 	private static function placeholder_id() {
-		$id = (int) get_option( 'catalogforge_preview_placeholder' );
+		$id = (int) get_option( 'storegenie_preview_placeholder' );
 		if ( $id && 'product' === get_post_type( $id ) ) {
 			return $id;
 		}
@@ -60,18 +60,18 @@ class CF_Preview {
 		$p->set_name( 'StoreGenie Pro preview placeholder' );
 		$p->set_status( 'draft' );
 		$p->set_catalog_visibility( 'hidden' );
-		$p->update_meta_data( '_cf_preview_placeholder', 1 );
+		$p->update_meta_data( '_sg_preview_placeholder', 1 );
 		$id = $p->save();
-		update_option( 'catalogforge_preview_placeholder', $id, false );
+		update_option( 'storegenie_preview_placeholder', $id, false );
 		return $id;
 	}
 
 	public static function init() {
-		if ( empty( $_GET['cf_preview'] ) || is_admin() ) { // phpcs:ignore WordPress.Security.NonceVerification
+		if ( empty( $_GET['sg_preview'] ) || is_admin() ) { // phpcs:ignore WordPress.Security.NonceVerification
 			return;
 		}
-		$token = preg_replace( '/[^A-Za-z0-9]/', '', (string) wp_unslash( $_GET['cf_preview'] ) ); // phpcs:ignore WordPress.Security.NonceVerification
-		$state = get_transient( 'cf_pv_' . $token );
+		$token = preg_replace( '/[^A-Za-z0-9]/', '', (string) wp_unslash( $_GET['sg_preview'] ) ); // phpcs:ignore WordPress.Security.NonceVerification
+		$state = get_transient( 'sg_pv_' . $token );
 		if ( ! is_array( $state ) ) {
 			return;
 		}

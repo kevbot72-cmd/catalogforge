@@ -218,7 +218,7 @@ function PropRow({ def, rows, stage }: { def: FieldDef; rows: ProductRow[]; stag
   } else editor = <TextCell def={def} c={c} tip={tip} stage={stage} />;
 
   return (
-    <div className={clsx("cf-prop grid grid-cols-[minmax(110px,38%)_minmax(0,1fr)_22px] items-center gap-2 border-b border-line/60", def.wide && "col-span-full")}>
+    <div className={clsx("sg-prop grid grid-cols-[minmax(110px,38%)_minmax(0,1fr)_22px] items-center gap-2 border-b border-line/60", def.wide && "col-span-full")}>
       <span className="flex min-w-0 items-center gap-1 text-[12.5px] text-muted" title={def.hint}>
         <span className="truncate">{def.label}</span>
         {def.hint && <Info size={11} className="shrink-0 opacity-60" />}
@@ -545,7 +545,7 @@ function AttributesBlock({ rows, stage }: { rows: ProductRow[]; stage: (e: Edit[
               <td className="py-1.5 text-muted">{[...values].join(", ") || "—"}</td>
               <td className="w-64 py-1.5"><TagInput value={[]} onChange={(v) => addValues(attr, v)} suggestions={(taxonomy?.attributes.find((t) => t.taxonomy === attr.taxonomy)?.terms ?? []).map((t) => t.name)} placeholder="Add values to all" label={`Add ${attr.name} values`} /></td>
               <td className="w-8 py-1.5 text-right">
-                <button className="cf-close rounded p-0.5" title="Remove from all" aria-label={`Remove ${attr.name} from all`} onClick={() => stage(mapEdits(applicable, "attributes", (cur) => ((cur as ProductAttribute[]) ?? []).filter((x) => keyOf(x) !== keyOf(attr))), `Removed ${attr.name}`)}><Trash2 size={13} /></button>
+                <button className="sg-close rounded p-0.5" title="Remove from all" aria-label={`Remove ${attr.name} from all`} onClick={() => stage(mapEdits(applicable, "attributes", (cur) => ((cur as ProductAttribute[]) ?? []).filter((x) => keyOf(x) !== keyOf(attr))), `Removed ${attr.name}`)}><Trash2 size={13} /></button>
               </td>
             </tr>
           ))}
@@ -844,7 +844,7 @@ export function EditPanel() {
           {multi && <label className="flex items-center gap-1.5 text-xs text-muted"><input type="checkbox" checked={onlyMixed} onChange={(e) => setOnlyMixed(e.target.checked)} data-testid="panel-only-mixed" /> Only show fields that differ</label>}
         </div>
         <div ref={bodyRef} className="min-h-0 flex-1 overflow-auto px-4 pb-4">
-          <div className={clsx("grid gap-x-8", bottom ? "grid-cols-1 lg:grid-cols-2" : "grid-cols-1", appearance.density === "compact" ? "[&_.cf-prop]:min-h-[30px]" : "[&_.cf-prop]:min-h-[36px]")}>
+          <div className={clsx("grid gap-x-8", bottom ? "grid-cols-1 lg:grid-cols-2" : "grid-cols-1", appearance.density === "compact" ? "[&_.sg-prop]:min-h-[30px]" : "[&_.sg-prop]:min-h-[36px]")}>
             {visibleFields.map((f) => <PropRow key={f.field} def={f} rows={rows} stage={stage} />)}
             {searching && !visibleFields.length && <div className="col-span-full py-4 text-[13px] text-muted">{onlyMixed && !find ? "Every field is the same on all the ticked products." : "No field matches."}</div>}
             {blocks}

@@ -16,7 +16,7 @@ export interface ViewState {
   overrides: Record<string, string[]>;
 }
 
-const KEY = "cf.views";
+const KEY = "sg.views";
 
 export function loadViews(builtIns: Record<string, string[]>): ViewState {
   const fallback: ViewState = { active: "Default", views: [], overrides: {} };
@@ -24,8 +24,8 @@ export function loadViews(builtIns: Record<string, string[]>): ViewState {
     const saved = JSON.parse(localStorage.getItem(KEY) ?? "null") as ViewState | null;
     if (saved) return { ...fallback, ...saved };
     // Before 0.5.1 there was one unnamed "Custom" view and the open preset's name.
-    const legacy = JSON.parse(localStorage.getItem("cf.columns") ?? "null") as string[] | null;
-    const preset = localStorage.getItem("cf.preset") ?? "Default";
+    const legacy = JSON.parse(localStorage.getItem("sg.columns") ?? "null") as string[] | null;
+    const preset = localStorage.getItem("sg.preset") ?? "Default";
     const views = legacy?.length ? [{ id: "v-custom", name: "Custom", columns: legacy }] : [];
     const active = preset === "Custom" && views.length ? "v-custom" : builtIns[preset] ? preset : "Default";
     return { active, views, overrides: {} };

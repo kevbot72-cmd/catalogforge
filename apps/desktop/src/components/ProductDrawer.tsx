@@ -282,7 +282,7 @@ export function AttributesEditor({ attrs, onChange, changed }: { attrs: ProductA
                 <label className="flex items-center gap-1"><input type="checkbox" checked={a.variation} onChange={(e) => onChange(attrs.map((x, j) => (j === i ? { ...x, variation: e.target.checked } : x)))} /> Used for variations</label>
               </div>
             </div>
-            <button type="button" className="cf-close rounded p-0.5" onClick={() => onChange(attrs.filter((_, j) => j !== i))} aria-label="Remove attribute"><Trash2 size={14} /></button>
+            <button type="button" className="sg-close rounded p-0.5" onClick={() => onChange(attrs.filter((_, j) => j !== i))} aria-label="Remove attribute"><Trash2 size={14} /></button>
           </div>
         ))}
         <Select value="" onChange={(e) => {
@@ -321,7 +321,7 @@ function CustomFieldsPanel({ row, fields, set, dirty }: { row: ProductRow; field
             ) : f.kind === "date" ? (
               <input type="date" className="h-8 w-full rounded-md border border-line bg-panel px-2 text-[13px]" value={dateIn(value)} onChange={(e) => set(id, /^\d{8}$/.test(value) ? e.target.value.replace(/-/g, "") : e.target.value)} />
             ) : (
-              <BufferedInput value={value} multiline={f.kind === "longtext"} inputMode={f.kind === "number" ? "decimal" : undefined} onCommit={(v) => set(id, v)} data-testid={`cf-${f.key}`} />
+              <BufferedInput value={value} multiline={f.kind === "longtext"} inputMode={f.kind === "number" ? "decimal" : undefined} onCommit={(v) => set(id, v)} data-testid={`sg-${f.key}`} />
             )}
           </Field>
         );

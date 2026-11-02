@@ -62,7 +62,7 @@ export function AddStoreDialog() {
     }
   };
 
-  const valid = kind === "local" ? !!siteId : kind === "connector" ? conn.trim().startsWith("cf1.") : kind === "rest" ? !!(rest.base_url && rest.consumer_key && rest.consumer_secret) : !!(my.host && my.database && my.user);
+  const valid = kind === "local" ? !!siteId : kind === "connector" ? conn.trim().startsWith("sg1.") : kind === "rest" ? !!(rest.base_url && rest.consumer_key && rest.consumer_secret) : !!(my.host && my.database && my.user);
 
   return (
     <Modal open={open} onClose={() => openDialog(null)} title="Add a store" width={760} testId="add-store-dialog"
@@ -114,8 +114,8 @@ export function AddStoreDialog() {
           </div>
         )}
         {kind === "connector" && (
-          <Field label="Connection string" hint={<>In wp-admin: install <b>StoreGenie Pro Connector</b>, then Tools → StoreGenie Pro → Create connection key. Paste the <code>cf1.…</code> string here. It is stored in your OS keychain.</>}>
-            <TextArea rows={3} value={conn} onChange={(e) => setConn(e.target.value)} placeholder="cf1.eyJ2Ijox…" className="font-mono text-xs" data-testid="connection-string" />
+          <Field label="Connection string" hint={<>In wp-admin: install <b>StoreGenie Pro Connector</b>, then Tools → StoreGenie Pro → Create connection key. Paste the <code>sg1.…</code> string here. It is stored in your OS keychain.</>}>
+            <TextArea rows={3} value={conn} onChange={(e) => setConn(e.target.value)} placeholder="sg1.eyJ2Ijox…" className="font-mono text-xs" data-testid="connection-string" />
           </Field>
         )}
         {kind === "rest" && (
@@ -134,7 +134,7 @@ export function AddStoreDialog() {
             <Field label="Password"><Input type="password" value={my.password} onChange={(e) => setMy({ ...my, password: e.target.value })} /></Field>
             <Field label="Table prefix"><Input value={my.table_prefix} onChange={(e) => setMy({ ...my, table_prefix: e.target.value })} /></Field>
             <Field label="Connector string for writes (optional)" className="col-span-2" hint="Without it the store is read-only: writes always go through WooCommerce so lookup tables and caches stay correct.">
-              <Input value={my.connection_string} onChange={(e) => setMy({ ...my, connection_string: e.target.value })} placeholder="cf1.…" />
+              <Input value={my.connection_string} onChange={(e) => setMy({ ...my, connection_string: e.target.value })} placeholder="sg1.…" />
             </Field>
           </div>
         )}

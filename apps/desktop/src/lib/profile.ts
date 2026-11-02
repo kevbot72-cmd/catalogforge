@@ -8,7 +8,7 @@ export interface UserProfile {
   avatar: string;
 }
 
-const KEY = "cf.user";
+const KEY = "sg.user";
 export const EMPTY_PROFILE: UserProfile = { name: "", alias: "", storeName: "", avatar: "" };
 
 export function loadProfile(): UserProfile {

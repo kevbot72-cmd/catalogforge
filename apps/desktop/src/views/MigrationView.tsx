@@ -71,9 +71,9 @@ function Stat({ value, label, tone }: { value: number | string; label: string; t
 /** Move a whole catalogue from one store into another (usually a new, empty one). */
 export function MigrationView() {
   const { backend, stores, storeId, selectStore, push, summary, busy, openDialog, toast, version } = useApp();
-  const [src, setSrc] = useState<string>(() => load("cf.migration.stores", { src: storeId ?? "", dst: "" }).src || storeId || "");
-  const [dst, setDst] = useState<string>(() => load("cf.migration.stores", { src: "", dst: "" }).dst);
-  const [opts, setOptsState] = useState<MigrateOptions>(() => load("cf.migration.options", DEFAULTS));
+  const [src, setSrc] = useState<string>(() => load("sg.migration.stores", { src: storeId ?? "", dst: "" }).src || storeId || "");
+  const [dst, setDst] = useState<string>(() => load("sg.migration.stores", { src: "", dst: "" }).dst);
+  const [opts, setOptsState] = useState<MigrateOptions>(() => load("sg.migration.options", DEFAULTS));
   const [infos, setInfos] = useState<Record<string, StoreInfo | null>>({});
   const [srcCats, setSrcCats] = useState<CategoryRow[]>([]);
   const [preview, setPreview] = useState<MigrationSummary | null>(null);
@@ -87,9 +87,9 @@ export function MigrationView() {
   const setOpts = (p: Partial<MigrateOptions>) => {
     const next = { ...opts, ...p };
     setOptsState(next);
-    save("cf.migration.options", next);
+    save("sg.migration.options", next);
   };
-  useEffect(() => save("cf.migration.stores", { src, dst }), [src, dst]);
+  useEffect(() => save("sg.migration.stores", { src, dst }), [src, dst]);
   // A sensible destination: the first other store.
   useEffect(() => {
     if (!dst || dst === src) setDst(stores.find((s) => s.id !== src)?.id ?? "");

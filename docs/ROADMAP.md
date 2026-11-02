@@ -28,10 +28,19 @@ Measured on the test machine (PHP built-in server, untuned MariaDB, so real host
 | Pull via connector | ~740 products/s |
 | Pull via direct MySQL / Local | ~5,800 products/s (6,695 products in 1.2 s) |
 
+## New in 0.7.0
+
+- **Complete rename to StoreGenie**, inside as well as out: the plugin is now **StoreGenie Pro Connector 1.0.0** in the folder `storegenie-connector`, answering on `/wp-json/storegenie/v1` with `X-SG-` signed requests and `sg1.` connection strings; the app's identifier is `com.storegenie.pro`; the engine is `storegenie-core`.
+- **Nothing to set up again.** Everything that carried the old name is moved over automatically:
+  - **On the store**, the new plugin (on its first run) copies the connection keys and settings to their new names, renames its product, category and image data (`_cf_…` → `_sg_…`, e.g. SEO fallbacks, banner images, image fingerprints and the "migrated from" markers), and switches the old CatalogForge Connector off so it can be deleted.
+  - **Old plugin still installed?** The app detects it and keeps working, so stores can be updated one at a time. Old apps also keep working with the new plugin (it answers on the old address too).
+  - **In the app**, on first launch: the app folders (stores, caches, settings and, on Windows, saved preferences) move from the old name to the new, keychain secrets are moved to the new name the first time they're used, and saved preferences under the old keys are copied over. Local sites get the new plugin and their old key keeps working.
+- **Verified** on two WooCommerce stores that started on the old plugin: the new app worked against the old plugin; installing the new plugin carried over 14 and 1 connection keys and renamed every old meta key (including 11,742 migrated-product markers); the old plugin was switched off; then every engine integration test, the plugin smoke test (new and old client) and a 13,804-product migration passed on the new plugin.
+
 ## New in 0.6.0
 
 - **New name: StoreGenie Pro** (previously CatalogForge), with the new logo, window icon and favicon. The connector plugin is now **StoreGenie Pro Connector 0.4.0** (Tools → StoreGenie Pro in wp-admin).
-  - Behind the scenes the technical names stay as they were (the plugin's folder `catalogforge-connector`, its web address `/wp-json/catalogforge/v1`, saved keys and options, the app's data folder), so connected stores, keys, caches, staged edits and settings carry straight over. Updating the plugin in place (Upload → Replace current) keeps it connected.
+  - Behind the scenes the technical names stay as they were (the plugin's folder `storegenie-connector`, its web address `/wp-json/storegenie/v1`, saved keys and options, the app's data folder), so connected stores, keys, caches, staged edits and settings carry straight over. Updating the plugin in place (Upload → Replace current) keeps it connected.
   - On Windows, the new installer installs "StoreGenie Pro" next to the old "CatalogForge"; once it runs, uninstall CatalogForge from Settings → Apps. Your stores and settings are kept because they're stored separately.
 - **Welcome screen** at launch: "Welcome back, {nickname}!", a box with your stores (the last one you used is picked), **Enter store** and **Take me to settings**. With no stores yet it offers **Add a store**.
 - **Settings → Your details:** name, alias/nickname, e-commerce store name and a picture (cropped to a circle and resized). The welcome screen uses them.

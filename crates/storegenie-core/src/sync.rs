@@ -813,7 +813,7 @@ pub fn clone_products(src: &Cache, src_store: &str, dst: &mut Cache, ids: &[i64]
                 fields.insert("gallery_ids".into(), Value::Array(p.gallery_ids.iter().filter_map(|g| src_media(*g)).collect()));
             }
         }
-        fields.insert("meta".into(), json!({ "_cf_source": format!("{src_store}:{}", p.id) }));
+        fields.insert("meta".into(), json!({ "_sg_source": format!("{src_store}:{}", p.id) }));
         let entity = if p.kind == "variation" { Entity::Variation } else { Entity::Product };
         let existing = if opts.match_sku { dst.product_by_sku(&p.sku)? } else { None };
         match existing {

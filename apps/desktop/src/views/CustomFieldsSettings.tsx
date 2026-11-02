@@ -69,17 +69,17 @@ export function CustomFieldsSettings() {
                   <td className="w-32 py-1 pr-2">
                     <Select value={f.kind} onChange={(e) => update(f.key, { kind: e.target.value as CustomFieldKind })}>{KINDS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</Select>
                   </td>
-                  <td className="w-8"><button className="cf-close rounded p-0.5" onClick={() => setFields(fields.filter((x) => x.key !== f.key))} aria-label={`Stop managing ${f.key}`}><Trash2 size={14} /></button></td>
+                  <td className="w-8"><button className="sg-close rounded p-0.5" onClick={() => setFields(fields.filter((x) => x.key !== f.key))} aria-label={`Stop managing ${f.key}`}><Trash2 size={14} /></button></td>
                 </tr>
               ))}
             </tbody>
           </table>
         )}
         <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" icon={busy === "scan" ? <Loader2 size={13} className="animate-spin" /> : <Search size={13} />} onClick={scan} disabled={!!busy} data-testid="cf-scan">Find fields on this store</Button>
+          <Button size="sm" icon={busy === "scan" ? <Loader2 size={13} className="animate-spin" /> : <Search size={13} />} onClick={scan} disabled={!!busy} data-testid="sg-scan">Find fields on this store</Button>
           <span className="flex-1" />
           {dirty && <Button size="sm" variant="close" onClick={() => setFields(info?.profile.custom_fields ?? [])} disabled={!!busy}>Cancel</Button>}
-          <Button size="sm" variant="primary" disabled={!dirty || !!busy} onClick={save} icon={busy === "save" ? <Loader2 size={13} className="animate-spin" /> : undefined} data-testid="cf-save">Save and sync</Button>
+          <Button size="sm" variant="primary" disabled={!dirty || !!busy} onClick={save} icon={busy === "save" ? <Loader2 size={13} className="animate-spin" /> : undefined} data-testid="sg-save">Save and sync</Button>
         </div>
         {found && (
           <div className="rounded-md border border-line">
@@ -95,7 +95,7 @@ export function CustomFieldsSettings() {
                   <tbody>
                     {visible.map((m) => (
                       <tr key={m.key} className="border-t border-line first:border-0 hover:bg-sunken">
-                        <td className="w-8 p-2"><input type="checkbox" checked={fields.some((f) => f.key === m.key)} onChange={() => toggle(m)} aria-label={`Manage ${m.key}`} data-testid={`cf-pick-${m.key}`} /></td>
+                        <td className="w-8 p-2"><input type="checkbox" checked={fields.some((f) => f.key === m.key)} onChange={() => toggle(m)} aria-label={`Manage ${m.key}`} data-testid={`sg-pick-${m.key}`} /></td>
                         <td className="p-2">
                           <div className="font-medium">{m.label || prettyKey(m.key)} {m.source && <Badge tone="accent">{m.source}</Badge>}</div>
                           <code className="text-2xs text-muted">{m.key}</code>

@@ -63,25 +63,25 @@ body {
 }
 
 /* A: red text. B: red outline (default). C: soft red pill. */
-.cf-close {
+.sg-close {
   color: rgb(var(--close-fg));
   transition: background-color 0.12s, border-color 0.12s;
 }
-.cf-close:hover {
+.sg-close:hover {
   background-color: rgb(var(--close-soft));
 }
-:root[data-close="b"] .cf-close {
+:root[data-close="b"] .sg-close {
   border: 1px solid rgb(var(--close-line));
   background-color: rgb(var(--panel));
 }
-:root[data-close="b"] .cf-close:hover {
+:root[data-close="b"] .sg-close:hover {
   background-color: rgb(var(--close-soft));
 }
-:root[data-close="c"] .cf-close {
+:root[data-close="c"] .sg-close {
   background-color: rgb(var(--close-soft));
   border-radius: 9999px;
 }
-:root[data-close="c"] .cf-close:hover {
+:root[data-close="c"] .sg-close:hover {
   background-color: rgb(var(--close-line) / 0.45);
 }
 
@@ -118,7 +118,7 @@ body {
   pointer-events: auto;
 }
 
-@keyframes cf-indeterminate {
+@keyframes sg-indeterminate {
   0% {
     transform: translateX(-100%);
   }
@@ -126,6 +126,6 @@ body {
     transform: translateX(300%);
   }
 }
-.cf-indeterminate {
-  animation: cf-indeterminate 1.2s ease-in-out infinite;
+.sg-indeterminate {
+  animation: sg-indeterminate 1.2s ease-in-out infinite;
 }

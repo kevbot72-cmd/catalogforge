@@ -129,7 +129,10 @@ pub struct SecretStore {
     file: PathBuf,
 }
 
-const KEYCHAIN_SERVICE: &str = "com.catalogforge.desktop";
+const KEYCHAIN_SERVICE: &str = "com.storegenie.pro";
+/// Keychain service used before the rename to StoreGenie Pro; secrets found there are moved over.
+#[allow(dead_code)]
+const LEGACY_KEYCHAIN_SERVICE: &str = "com.catalogforge.desktop";
 
 impl SecretStore {
     pub fn new(dir: &Path) -> Self {
@@ -153,6 +156,14 @@ impl SecretStore {
         if let Ok(entry) = keyring::Entry::new(KEYCHAIN_SERVICE, name) {
             if let Ok(v) = entry.get_password() {
                 return Ok(v);
+            }
+            if let Ok(old) = keyring::Entry::new(LEGACY_KEYCHAIN_SERVICE, name) {
+                if let Ok(v) = old.get_password() {
+                    if entry.set_password(&v).is_ok() {
+                        let _ = old.delete_credential();
+                    }
+                    return Ok(v);
+                }
             }
         }
         self.read_file().remove(name).ok_or_else(|| anyhow::anyhow!("No saved secret for {name}; reconnect the store."))

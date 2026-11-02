@@ -30,12 +30,12 @@ function call( $method, $route, array $query = array(), $body = '', $manifest = 
 	global $base, $key, $secret;
 	$ts    = (string) time();
 	$nonce = $nonce ?? bin2hex( random_bytes( 12 ) );
-	$canon = implode( "\n", array( $ts, $nonce, $method, '/catalogforge/v1' . $route, canonical_query( $query ), hash( 'sha256', $body ), hash( 'sha256', $manifest ) ) );
+	$canon = implode( "\n", array( $ts, $nonce, $method, '/storegenie/v1' . $route, canonical_query( $query ), hash( 'sha256', $body ), hash( 'sha256', $manifest ) ) );
 	$sig   = hash_hmac( 'sha256', $canon, $secret );
-	$url   = $base . '/wp-json/catalogforge/v1' . $route . ( $query ? '?' . canonical_query( $query ) : '' );
-	$h     = array( "X-CF-Key: $key", "X-CF-Timestamp: $ts", "X-CF-Nonce: $nonce", "X-CF-Signature: $sig" );
+	$url   = $base . '/wp-json/storegenie/v1' . $route . ( $query ? '?' . canonical_query( $query ) : '' );
+	$h     = array( "X-SG-Key: $key", "X-SG-Timestamp: $ts", "X-SG-Nonce: $nonce", "X-SG-Signature: $sig" );
 	if ( $manifest ) {
-		$h[] = "X-CF-Manifest: $manifest";
+		$h[] = "X-SG-Manifest: $manifest";
 		$h[] = 'Content-Type: application/octet-stream';
 	} elseif ( $body ) {
 		$h[] = 'Content-Type: application/json';

@@ -1,4 +1,4 @@
-// Mirrors forge-core's serde types. Keep field names identical to the Rust/PHP wire format.
+// Mirrors storegenie-core's serde types. Keep field names identical to the Rust/PHP wire format.
 
 export type Entity = "category" | "tag" | "media" | "product" | "variation";
 export type Environment = "local" | "staging" | "production";

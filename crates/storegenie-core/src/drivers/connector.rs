@@ -10,9 +10,14 @@ use base64::Engine;
 use reqwest::{Method, StatusCode};
 use serde::de::DeserializeOwned;
 use std::io::Write;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 
-const NS: &str = "/catalogforge/v1";
+const NS: &str = "/storegenie/v1";
+/// Address and header prefix of the plugin before it was renamed (CatalogForge Connector).
+/// Stores still running it are detected on the first request and keep working.
+const LEGACY_NS: &str = "/catalogforge/v1";
 const GZIP_THRESHOLD: usize = 32 * 1024;
 
 #[derive(Clone)]
@@ -26,6 +31,8 @@ pub struct ConnectorDriver {
     host_override: Option<String>,
     batch_size: usize,
     custom: super::MetaKeys,
+    /// The store runs the old CatalogForge Connector (found out on the first request).
+    legacy: Arc<AtomicBool>,
 }
 
 impl ConnectorDriver {
@@ -49,6 +56,7 @@ impl ConnectorDriver {
             host_override: None,
             batch_size: 250,
             custom: Default::default(),
+            legacy: Default::default(),
         })
     }
 
@@ -71,16 +79,30 @@ impl ConnectorDriver {
         self
     }
 
+    fn ns(&self) -> &'static str {
+        if self.legacy.load(Ordering::Relaxed) {
+            LEGACY_NS
+        } else {
+            NS
+        }
+    }
+
+    /// True when the store still runs the CatalogForge Connector (it works, but should be updated).
+    pub fn is_legacy_plugin(&self) -> bool {
+        self.legacy.load(Ordering::Relaxed)
+    }
+
     fn url(&self, route: &str, query: &str) -> String {
+        let ns = self.ns();
         if self.rest_root.contains("rest_route=") {
-            let mut u = format!("{}{}{}", self.rest_root, NS.trim_start_matches('/'), route);
+            let mut u = format!("{}{}{}", self.rest_root, ns.trim_start_matches('/'), route);
             if !query.is_empty() {
                 u.push('&');
                 u.push_str(query);
             }
             u
         } else {
-            let mut u = format!("{}{}{}", self.rest_root, NS.trim_start_matches('/'), route);
+            let mut u = format!("{}{}{}", self.rest_root, ns.trim_start_matches('/'), route);
             if !query.is_empty() {
                 u.push('?');
                 u.push_str(query);
@@ -106,23 +128,25 @@ impl ConnectorDriver {
             attempt += 1;
             let ts = chrono::Utc::now().timestamp();
             let nonce = signing::nonce();
-            let canonical = signing::canonical_string(ts, &nonce, method.as_str(), &format!("{NS}{route}"), &query, &body, &manifest);
+            let legacy = self.is_legacy_plugin();
+            let canonical = signing::canonical_string(ts, &nonce, method.as_str(), &format!("{}{route}", self.ns()), &query, &body, &manifest);
             let sig = signing::sign(&self.secret, &canonical);
+            let h = |name: &str| format!("{}{name}", if legacy { "X-CF-" } else { "X-SG-" });
             let mut req = self
                 .client
                 .request(method.clone(), self.url(route, &query))
-                .header("X-CF-Key", &self.key)
-                .header("X-CF-Timestamp", ts.to_string())
-                .header("X-CF-Nonce", &nonce)
-                .header("X-CF-Signature", sig);
+                .header(h("Key"), &self.key)
+                .header(h("Timestamp"), ts.to_string())
+                .header(h("Nonce"), &nonce)
+                .header(h("Signature"), sig);
             if let Some(host) = &self.host_override {
                 req = req.header(reqwest::header::HOST, host);
             }
             if !manifest.is_empty() {
-                req = req.header("X-CF-Manifest", &manifest);
+                req = req.header(h("Manifest"), &manifest);
             }
             if gzip {
-                req = req.header("X-CF-Encoding", "gzip");
+                req = req.header(h("Encoding"), "gzip");
             }
             if !body.is_empty() {
                 req = req.header(reqwest::header::CONTENT_TYPE, content_type).body(body.clone());
@@ -145,6 +169,13 @@ impl ConnectorDriver {
                     .and_then(|v| v.get("message").and_then(|m| m.as_str()).map(String::from))
                     .unwrap_or_else(|| text.chars().take(300).collect());
                 if status == StatusCode::NOT_FOUND && msg.contains("No route") {
+                    if !legacy {
+                        // Maybe the store still runs the plugin under its old name: try that once.
+                        self.legacy.store(true, Ordering::Relaxed);
+                        attempt -= 1;
+                        continue;
+                    }
+                    self.legacy.store(false, Ordering::Relaxed);
                     bail!("The StoreGenie Pro Connector plugin is not active on this store.");
                 }
                 bail!("Store returned {status}: {msg}");
@@ -337,8 +368,8 @@ mod tests {
         assert_eq!(normalise_rest_root("https://a.com/wp-json/"), "https://a.com/wp-json/");
         assert_eq!(normalise_rest_root("https://a.com/?rest_route=/"), "https://a.com/?rest_route=/");
         let d = ConnectorDriver::new("https://a.com/?rest_route=/", "k", "s").unwrap();
-        assert_eq!(d.url("/catalog", "limit=5"), "https://a.com/?rest_route=/catalogforge/v1/catalog&limit=5");
+        assert_eq!(d.url("/catalog", "limit=5"), "https://a.com/?rest_route=/storegenie/v1/catalog&limit=5");
         let d = ConnectorDriver::new("https://a.com/shop", "k", "s").unwrap();
-        assert_eq!(d.url("/catalog", "limit=5"), "https://a.com/shop/wp-json/catalogforge/v1/catalog?limit=5");
+        assert_eq!(d.url("/catalog", "limit=5"), "https://a.com/shop/wp-json/storegenie/v1/catalog?limit=5");
     }
 }

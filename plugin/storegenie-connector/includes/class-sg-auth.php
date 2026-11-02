@@ -3,15 +3,15 @@
  * Request signing.
  *
  * Every request carries:
- *   X-CF-Key        key id
- *   X-CF-Timestamp  unix seconds (must be within ±300s of server time)
- *   X-CF-Nonce      random string, single use within the replay window
- *   X-CF-Signature  hex HMAC-SHA256(secret, canonical string)
+ *   X-SG-Key        key id
+ *   X-SG-Timestamp  unix seconds (must be within ±300s of server time)
+ *   X-SG-Nonce      random string, single use within the replay window
+ *   X-SG-Signature  hex HMAC-SHA256(secret, canonical string)
  *
  * Canonical string (lines joined with "\n"):
- *   timestamp, nonce, METHOD, route, canonical query, sha256(body), sha256(X-CF-Manifest header)
+ *   timestamp, nonce, METHOD, route, canonical query, sha256(body), sha256(X-SG-Manifest header)
  *
- * Keys are stored as a JSON document in the `catalogforge_keys` option (JSON rather than a
+ * Keys are stored as a JSON document in the `storegenie_keys` option (JSON rather than a
  * PHP-serialized array so the desktop app can provision a key directly in a Local site's
  * database without a PHP runtime).
  *
@@ -20,9 +20,9 @@
 
 defined( 'ABSPATH' ) || exit;
 
-class CF_Auth {
+class SG_Auth {
 
-	const OPTION        = 'catalogforge_keys';
+	const OPTION        = 'storegenie_keys';
 	const WINDOW        = 300;
 	const NONCE_TTL     = 600;
 
@@ -44,7 +44,7 @@ class CF_Auth {
 	 */
 	public static function create_key( $user_id, $label ) {
 		$keys            = self::get_keys();
-		$key             = 'cf_' . strtolower( wp_generate_password( 16, false, false ) );
+		$key             = 'sg_' . strtolower( wp_generate_password( 16, false, false ) );
 		$secret          = bin2hex( random_bytes( 32 ) );
 		$keys[ $key ]    = array(
 			'secret'  => $secret,
@@ -63,19 +63,19 @@ class CF_Auth {
 	}
 
 	/**
-	 * Connection string the user pastes into the app: cf1.<base64url(json)>.
+	 * Connection string the user pastes into the app: sg1.<base64url(json)>.
 	 */
 	public static function connection_string( $key, $secret ) {
 		$payload = wp_json_encode(
 			array(
-				'v'      => CATALOGFORGE_PROTOCOL,
+				'v'      => STOREGENIE_PROTOCOL,
 				'url'    => home_url( '/' ),
 				'rest'   => rest_url(),
 				'key'    => $key,
 				'secret' => $secret,
 			)
 		);
-		return 'cf1.' . rtrim( strtr( base64_encode( $payload ), '+/', '-_' ), '=' );
+		return 'sg1.' . rtrim( strtr( base64_encode( $payload ), '+/', '-_' ), '=' );
 	}
 
 	public static function canonical_query( array $params ) {
@@ -107,32 +107,44 @@ class CF_Auth {
 	}
 
 	/**
+	 * Reads an X-SG-* header, or the X-CF-* one apps from before the rename (CatalogForge) send.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @param string          $name    Header name after the prefix, e.g. "key".
+	 * @return string|null
+	 */
+	public static function header( $request, $name ) {
+		$v = $request->get_header( 'x_sg_' . $name );
+		return ( null !== $v && '' !== $v ) ? $v : $request->get_header( 'x_cf_' . $name );
+	}
+
+	/**
 	 * REST permission callback.
 	 *
 	 * @param WP_REST_Request $request Request.
 	 * @return true|WP_Error
 	 */
 	public static function check( $request ) {
-		$key   = (string) $request->get_header( 'x_cf_key' );
-		$ts    = (string) $request->get_header( 'x_cf_timestamp' );
-		$nonce = (string) $request->get_header( 'x_cf_nonce' );
-		$sig   = (string) $request->get_header( 'x_cf_signature' );
+		$key   = (string) self::header( $request, 'key' );
+		$ts    = (string) self::header( $request, 'timestamp' );
+		$nonce = (string) self::header( $request, 'nonce' );
+		$sig   = (string) self::header( $request, 'signature' );
 
 		if ( '' === $key || '' === $ts || '' === $nonce || '' === $sig ) {
-			return new WP_Error( 'cf_unsigned', 'Missing StoreGenie Pro signature headers.', array( 'status' => 401 ) );
+			return new WP_Error( 'sg_unsigned', 'Missing StoreGenie Pro signature headers.', array( 'status' => 401 ) );
 		}
 		$keys = self::get_keys();
 		if ( empty( $keys[ $key ]['secret'] ) ) {
-			return new WP_Error( 'cf_bad_key', 'Unknown or revoked key.', array( 'status' => 401 ) );
+			return new WP_Error( 'sg_bad_key', 'Unknown or revoked key.', array( 'status' => 401 ) );
 		}
 		if ( ! ctype_digit( $ts ) || abs( time() - (int) $ts ) > self::WINDOW ) {
-			return new WP_Error( 'cf_clock', 'Timestamp outside the allowed window; check the computer clock.', array( 'status' => 401, 'server_time' => time() ) );
+			return new WP_Error( 'sg_clock', 'Timestamp outside the allowed window; check the computer clock.', array( 'status' => 401, 'server_time' => time() ) );
 		}
 		if ( ! preg_match( '/^[A-Za-z0-9_-]{8,64}$/', $nonce ) ) {
-			return new WP_Error( 'cf_nonce', 'Malformed nonce.', array( 'status' => 401 ) );
+			return new WP_Error( 'sg_nonce', 'Malformed nonce.', array( 'status' => 401 ) );
 		}
 
-		$manifest  = (string) $request->get_header( 'x_cf_manifest' );
+		$manifest  = (string) self::header( $request, 'manifest' );
 		$canonical = self::canonical_string(
 			$ts,
 			$nonce,
@@ -144,19 +156,19 @@ class CF_Auth {
 		);
 		$expected  = hash_hmac( 'sha256', $canonical, $keys[ $key ]['secret'] );
 		if ( ! hash_equals( $expected, strtolower( $sig ) ) ) {
-			return new WP_Error( 'cf_signature', 'Signature mismatch.', array( 'status' => 401 ) );
+			return new WP_Error( 'sg_signature', 'Signature mismatch.', array( 'status' => 401 ) );
 		}
 
-		$nonce_key = 'cf_n_' . md5( $key . $nonce );
+		$nonce_key = 'sg_n_' . md5( $key . $nonce );
 		if ( get_transient( $nonce_key ) ) {
-			return new WP_Error( 'cf_replay', 'Nonce already used.', array( 'status' => 401 ) );
+			return new WP_Error( 'sg_replay', 'Nonce already used.', array( 'status' => 401 ) );
 		}
 		set_transient( $nonce_key, 1, self::NONCE_TTL );
 
 		$user_id = (int) $keys[ $key ]['user_id'];
 		$user    = get_user_by( 'id', $user_id );
 		if ( ! $user || ! user_can( $user, 'manage_woocommerce' ) ) {
-			return new WP_Error( 'cf_user', 'The user bound to this key can no longer manage WooCommerce.', array( 'status' => 403 ) );
+			return new WP_Error( 'sg_user', 'The user bound to this key can no longer manage WooCommerce.', array( 'status' => 403 ) );
 		}
 		// Act as the bound user so capability checks, kses rules and authorship behave as in wp-admin.
 		wp_set_current_user( $user_id );
@@ -169,7 +181,7 @@ class CF_Auth {
 	}
 
 	/**
-	 * Raw request body, transparently gunzipped when the client sent X-CF-Encoding: gzip.
+	 * Raw request body, transparently gunzipped when the client sent X-SG-Encoding: gzip.
 	 * The signature is computed over the bytes on the wire.
 	 */
 	public static function raw_body( $request ) {
@@ -183,7 +195,7 @@ class CF_Auth {
 	 */
 	public static function json_body( $request ) {
 		$body = self::raw_body( $request );
-		if ( 'gzip' === strtolower( (string) $request->get_header( 'x_cf_encoding' ) ) ) {
+		if ( 'gzip' === strtolower( (string) self::header( $request, 'encoding' ) ) ) {
 			$body = gzdecode( $body );
 			if ( false === $body ) {
 				return array();

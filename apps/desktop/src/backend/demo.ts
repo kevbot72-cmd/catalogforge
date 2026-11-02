@@ -1,4 +1,4 @@
-// In-browser demo backend. Mirrors forge-core's staging semantics (overlay, base values, grouped
+// In-browser demo backend. Mirrors storegenie-core's staging semantics (overlay, base values, grouped
 // undo, push history, revert) over generated stores so the whole UI can be used — and tested —
 // without a WooCommerce site.
 
@@ -187,7 +187,7 @@ function generate(profile: StoreProfile, seed: number, count: number): StoreData
 
 const DEFAULT_SETTINGS: MediaSettings = { format: "webp", quality: 82, max_dimension: 2560, generate_sizes: true, name_template: "{sku}-{name}-{n}" };
 
-/** The demo's version of forge-core's migrate::plan (same rules, simpler bookkeeping). */
+/** The demo's version of storegenie-core's migrate::plan (same rules, simpler bookkeeping). */
 function migrationPlan(src: StoreData, dst: StoreData, opts: MigrateOptions): { summary: MigrationSummary; edits: Edit[] } {
   const sum: MigrationSummary = { categories_create: 0, categories_existing: 0, products_create: 0, products_update: 0, products_skip: 0, variations: 0, images: 0, tags: 0, attributes: [], custom_fields: [], no_sku: 0, duplicate_skus: [], already_staged: 0, already_staged_categories: 0, source_products: 0, target_products: [...dst.products.values()].filter((p) => p.type !== "variation").length, warnings: [] };
   const edits: Edit[] = [];

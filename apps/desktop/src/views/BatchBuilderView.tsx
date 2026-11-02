@@ -149,10 +149,10 @@ function BlankMenu(p: {
 export function BatchBuilderView() {
   const { backend, storeId, info, taxonomy, create, stage, setQuery, setView, toast } = useApp();
   const symbol = info?.handshake?.currency_symbol ?? "$";
-  const [blanks, setBlanks] = useState<Blank[]>(() => load("cf.batch.blanks", [MUG_BLANK]));
-  const [currentId, setCurrentId] = useState<string>(() => load("cf.batch.current", MUG_BLANK.id));
-  const [col, setColState] = useState<Collection>(() => ({ ...collectionDefaults(), ...load<Partial<Collection>>("cf.batch.collection", {}) }));
-  const [history, setHistory] = useState<HistoryEntry[]>(() => load("cf.batch.history", []));
+  const [blanks, setBlanks] = useState<Blank[]>(() => load("sg.batch.blanks", [MUG_BLANK]));
+  const [currentId, setCurrentId] = useState<string>(() => load("sg.batch.current", MUG_BLANK.id));
+  const [col, setColState] = useState<Collection>(() => ({ ...collectionDefaults(), ...load<Partial<Collection>>("sg.batch.collection", {}) }));
+  const [history, setHistory] = useState<HistoryEntry[]>(() => load("sg.batch.history", []));
   const [files, setFiles] = useState<BatchImage[]>([]);
   const [shared, setShared] = useState<BatchImage[]>([]);
   const [matchMode, setMatchMode] = useState<"number" | "order">("number");
@@ -168,19 +168,19 @@ export function BatchBuilderView() {
   const setBlank = (b: Blank) => {
     const next = blanks.map((x) => (x.id === b.id ? b : x));
     setBlanks(next);
-    save("cf.batch.blanks", next);
+    save("sg.batch.blanks", next);
   };
   const addBlank = (b: Blank) => {
     const next = [...blanks, b];
     setBlanks(next);
     setCurrentId(b.id);
-    save("cf.batch.blanks", next);
-    save("cf.batch.current", b.id);
+    save("sg.batch.blanks", next);
+    save("sg.batch.current", b.id);
   };
   // Saved straight away, so it sticks even when the page closes right after (e.g. after Add).
   const setCol = (p: Partial<Collection>) => {
     const next = { ...col, ...p };
-    save("cf.batch.collection", next);
+    save("sg.batch.collection", next);
     setColState(next);
   };
 
@@ -319,7 +319,7 @@ export function BatchBuilderView() {
       const entry: HistoryEntry = { at: Date.now(), store: info?.profile.name ?? "", blank: blank.label, design: col.design, first: items[0].sku, last: items[items.length - 1].sku, count: items.length };
       const h = [entry, ...history].slice(0, 20);
       setHistory(h);
-      save("cf.batch.history", h);
+      save("sg.batch.history", h);
       const made = plan.stats.create;
       toast({ tone: "success", title: `${made} product${made === 1 ? "" : "s"} added${plan.stats.update ? `, ${plan.stats.update} updated` : ""}${plan.stats.variations ? ` with ${plan.stats.variations} variations` : ""}`, body: `${images ? `${images} images upload on push. ` : ""}Review them in the grid, then Push.` });
       // The next batch carries on numbering from here.
@@ -397,14 +397,14 @@ export function BatchBuilderView() {
             <Step n={1} title="Product blank" testId="step-blank"
               right={
                 <div className="flex items-center gap-1.5">
-                  <Select value={blank.id} onChange={(e) => { setCurrentId(e.target.value); save("cf.batch.current", e.target.value); }} className="w-52" aria-label="Saved blank" data-testid="blank-select">
+                  <Select value={blank.id} onChange={(e) => { setCurrentId(e.target.value); save("sg.batch.current", e.target.value); }} className="w-52" aria-label="Saved blank" data-testid="blank-select">
                     {blanks.map((b) => <option key={b.id} value={b.id}>{b.label || b.base || "Untitled blank"}</option>)}
                   </Select>
                   <BlankMenu
                     label={blank.label || blank.base || "Untitled blank"}
                     onRename={(label) => setBlank({ ...blank, label })}
                     onSave={() => {
-                      save("cf.batch.blanks", blanks);
+                      save("sg.batch.blanks", blanks);
                       toast({ tone: "success", title: `Blank “${blank.label || blank.base}” saved`, body: "Blanks also save as you type." });
                     }}
                     onSaveAs={(label) => addBlank({ ...blank, id: blankDefaults().id, label })}
@@ -417,7 +417,7 @@ export function BatchBuilderView() {
                       if (!window.confirm(`Delete the blank “${blank.label}”?`)) return;
                       const rest = blanks.filter((b) => b.id !== blank.id);
                       setBlanks(rest);
-                      save("cf.batch.blanks", rest);
+                      save("sg.batch.blanks", rest);
                       setCurrentId(rest[0].id);
                     }}
                   />
@@ -432,8 +432,8 @@ export function BatchBuilderView() {
                 <Field label="Design name"><Input value={col.design} onChange={(e) => setCol({ design: e.target.value })} data-testid="col-design" /></Field>
                 <Field label="Design code (for SKUs)"><Input value={col.code} onChange={(e) => setCol({ code: e.target.value })} data-testid="col-code" /></Field>
                 <Field label="Categories" className="col-span-2" hint="Pick one or type a new path; levels with >, several categories with |. New ones are created.">
-                  <Input value={col.categories} list="cf-cat-paths" onChange={(e) => setCol({ categories: e.target.value })} placeholder="11oz Mugs > Funny > Cats Funny" data-testid="col-categories" />
-                  <datalist id="cf-cat-paths">{paths.map((p) => <option key={p} value={p} />)}</datalist>
+                  <Input value={col.categories} list="sg-cat-paths" onChange={(e) => setCol({ categories: e.target.value })} placeholder="11oz Mugs > Funny > Cats Funny" data-testid="col-categories" />
+                  <datalist id="sg-cat-paths">{paths.map((p) => <option key={p} value={p} />)}</datalist>
                 </Field>
                 <Field label="Extra tags for this collection (|)" className="col-span-2"><Input value={col.tags} onChange={(e) => setCol({ tags: e.target.value })} /></Field>
               </div>

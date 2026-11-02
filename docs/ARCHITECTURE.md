@@ -7,7 +7,7 @@
 │        │ invoke() / events                                                       │
 │ Rust command layer (apps/desktop/src-tauri) ── OS keychain for secrets           │
 │        │                                                                         │
-│ forge-core ─┬─ Cache (SQLite per store): server state + staged diffs + undo log  │
+│ storegenie-core ─┬─ Cache (SQLite per store): server state + staged diffs + undo log  │
 │             │                          + push history + identity map            │
 │             ├─ Sync: pull (full / delta), push (media → ordered batches),        │
 │             │        conflict handling, cross-store clone                       │

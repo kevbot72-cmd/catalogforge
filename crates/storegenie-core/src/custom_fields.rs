@@ -48,7 +48,7 @@ pub fn is_internal_key(k: &str) -> bool {
         "_product_version", "_menu_order", "_wp_old_slug", "_wp_old_date", "_wp_page_template", "_wp_trash_meta_status",
         "_wp_trash_meta_time", "_wp_desired_post_slug", "_encloseme", "_pingme", "_has_variations",
     ];
-    const PREFIXES: &[&str] = &["_cf_", "_yoast_wpseo_", "rank_math_", "attribute_", "_wp_", "_oembed_", "_transient", "_wc_", "_woocommerce_"];
+    const PREFIXES: &[&str] = &["_sg_", "_cf_", "_yoast_wpseo_", "rank_math_", "attribute_", "_wp_", "_oembed_", "_transient", "_wc_", "_woocommerce_"];
     EXACT.contains(&k) || PREFIXES.iter().any(|p| k.starts_with(p))
 }
 

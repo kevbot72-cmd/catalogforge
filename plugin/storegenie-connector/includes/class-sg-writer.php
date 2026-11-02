@@ -27,7 +27,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-class CF_Writer {
+class SG_Writer {
 
 	/** @var array<string,int> client ref => real id */
 	private $refs = array();
@@ -302,17 +302,17 @@ class CF_Writer {
 	private function record( $entity, $id ) {
 		if ( 'category' === $entity ) {
 			$t = get_term( $id, 'product_cat' );
-			return ( $t && ! is_wp_error( $t ) ) ? CF_Serializer::category( $t ) : null;
+			return ( $t && ! is_wp_error( $t ) ) ? SG_Serializer::category( $t ) : null;
 		}
 		if ( 'media' === $entity ) {
-			return CF_Serializer::media( $id );
+			return SG_Serializer::media( $id );
 		}
 		if ( 'tag' === $entity ) {
 			$t = get_term( $id, 'product_tag' );
 			return ( $t && ! is_wp_error( $t ) ) ? array( 'id' => $t->term_id, 'name' => $t->name, 'slug' => $t->slug ) : null;
 		}
 		$p = wc_get_product( $id );
-		return $p ? CF_Serializer::product( $p ) : null;
+		return $p ? SG_Serializer::product( $p ) : null;
 	}
 
 	private function resolve( $value ) {
@@ -400,7 +400,7 @@ class CF_Writer {
 					$meta_keys[] = substr( $f, 5 );
 				}
 			}
-			$conflicts = $this->conflicts( self::flat_meta( CF_Serializer::product( $existing, $meta_keys ) ), $op['base'], self::flat_meta( $data ) );
+			$conflicts = $this->conflicts( self::flat_meta( SG_Serializer::product( $existing, $meta_keys ) ), $op['base'], self::flat_meta( $data ) );
 			if ( $conflicts ) {
 				return array( 'ok' => false, 'action' => 'conflict', 'id' => $id, 'conflicts' => $conflicts );
 			}
@@ -575,7 +575,7 @@ class CF_Writer {
 			}
 			$product->set_shipping_class_id( $id );
 		}
-		foreach ( CF_Serializer::seo_meta_map() as $field => $keys ) {
+		foreach ( SG_Serializer::seo_meta_map() as $field => $keys ) {
 			if ( array_key_exists( $field, $data ) ) {
 				foreach ( $keys as $key ) {
 					$product->update_meta_data( $key, (string) $data[ $field ] );
@@ -593,7 +593,7 @@ class CF_Writer {
 		}
 		if ( ! empty( $data['source_ref'] ) ) {
 			// Stable cross-environment identity (Local → staging → live promotion).
-			$product->update_meta_data( '_cf_guid', sanitize_text_field( $data['source_ref'] ) );
+			$product->update_meta_data( '_sg_guid', sanitize_text_field( $data['source_ref'] ) );
 		}
 	}
 
@@ -753,7 +753,7 @@ class CF_Writer {
 		if ( $id && 'check' === $this->options['conflicts'] && ! empty( $op['base'] ) ) {
 			$t = get_term( $id, 'product_cat' );
 			if ( $t && ! is_wp_error( $t ) ) {
-				$conflicts = $this->conflicts( CF_Serializer::category( $t ), $op['base'], $data );
+				$conflicts = $this->conflicts( SG_Serializer::category( $t ), $op['base'], $data );
 				if ( $conflicts ) {
 					return array( 'ok' => false, 'action' => 'conflict', 'id' => $id, 'conflicts' => $conflicts );
 				}
@@ -788,7 +788,7 @@ class CF_Writer {
 		$meta = array(
 			'display_type' => 'display_type',
 			'image_id'     => 'thumbnail_id',
-			'banner_id'    => '_cf_banner_id',
+			'banner_id'    => '_sg_banner_id',
 			'menu_order'   => 'order',
 		);
 		foreach ( $meta as $field => $key ) {
@@ -802,7 +802,7 @@ class CF_Writer {
 		}
 		$seo_keys = defined( 'RANK_MATH_VERSION' )
 			? array( 'seo_title' => 'rank_math_title', 'seo_description' => 'rank_math_description' )
-			: array( 'seo_title' => '_cf_seo_title', 'seo_description' => '_cf_seo_description' );
+			: array( 'seo_title' => '_sg_seo_title', 'seo_description' => '_sg_seo_description' );
 		foreach ( $seo_keys as $field => $key ) {
 			if ( array_key_exists( $field, $data ) ) {
 				update_term_meta( $term_id, $key, (string) $data[ $field ] );

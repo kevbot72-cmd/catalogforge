@@ -1,3 +1,5 @@
+// Must run before anything reads saved preferences (imports run before this file's own code).
+import "./lib/migrateStorage";
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { App } from "./App";

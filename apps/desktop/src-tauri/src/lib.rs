@@ -1,16 +1,16 @@
-//! Tauri command layer: a thin bridge from the UI to forge-core.
+//! Tauri command layer: a thin bridge from the UI to storegenie-core.
 
-use forge_core::cache::{Cache, Edit, ProductQuery, StagedSummary};
-use forge_core::connection::{ConnectionKind, Environment, ProfileStore, SecretStore, StoreProfile};
-use forge_core::drivers::connector::ConnectorDriver;
-use forge_core::drivers::local::{LocalDriver, LocalKey};
-use forge_core::drivers::mysql::{MysqlDriver, MysqlTarget};
-use forge_core::drivers::rest::RestDriver;
-use forge_core::drivers::{Capabilities, Driver};
-use forge_core::media::MediaSettings;
-use forge_core::model::{Entity, Handshake};
-use forge_core::sync::{self, CloneOptions, Progress, ProgressFn};
-use forge_core::{local, signing};
+use storegenie_core::cache::{Cache, Edit, ProductQuery, StagedSummary};
+use storegenie_core::connection::{ConnectionKind, Environment, ProfileStore, SecretStore, StoreProfile};
+use storegenie_core::drivers::connector::ConnectorDriver;
+use storegenie_core::drivers::local::{LocalDriver, LocalKey};
+use storegenie_core::drivers::mysql::{MysqlDriver, MysqlTarget};
+use storegenie_core::drivers::rest::RestDriver;
+use storegenie_core::drivers::{Capabilities, Driver};
+use storegenie_core::media::MediaSettings;
+use storegenie_core::model::{Entity, Handshake};
+use storegenie_core::sync::{self, CloneOptions, Progress, ProgressFn};
+use storegenie_core::{local, signing};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 use std::collections::HashMap;
@@ -228,14 +228,14 @@ async fn pull(app: AppHandle, state: State<'_, AppState>, id: String, full: bool
 /* ---------------------------------------------------------- custom fields */
 
 #[tauri::command]
-async fn meta_keys(state: State<'_, AppState>, id: String) -> CmdResult<Vec<forge_core::custom_fields::MetaKeyInfo>> {
+async fn meta_keys(state: State<'_, AppState>, id: String) -> CmdResult<Vec<storegenie_core::custom_fields::MetaKeyInfo>> {
     let s = state.store(&id).await?;
     s.driver.meta_keys().await.map_err(err)
 }
 
 /// Saves the store's custom fields. The caller re-pulls so products pick up the new fields.
 #[tauri::command]
-async fn set_custom_fields(state: State<'_, AppState>, id: String, fields: Vec<forge_core::custom_fields::CustomField>) -> CmdResult<StoreProfile> {
+async fn set_custom_fields(state: State<'_, AppState>, id: String, fields: Vec<storegenie_core::custom_fields::CustomField>) -> CmdResult<StoreProfile> {
     let s = state.store(&id).await?;
     let mut p = state.profiles.get(&id).map_err(err)?;
     s.driver.set_meta_keys(fields.iter().map(|f| f.key.clone()).collect());
@@ -247,14 +247,14 @@ async fn set_custom_fields(state: State<'_, AppState>, id: String, fields: Vec<f
 /* ---------------------------------------------------------------- catalog */
 
 #[tauri::command]
-async fn query(state: State<'_, AppState>, id: String, q: ProductQuery) -> CmdResult<forge_core::cache::QueryResult> {
+async fn query(state: State<'_, AppState>, id: String, q: ProductQuery) -> CmdResult<storegenie_core::cache::QueryResult> {
     let s = state.store(&id).await?;
     let c = s.cache.lock().unwrap();
     c.query(&q).map_err(err)
 }
 
 #[tauri::command]
-async fn rows(state: State<'_, AppState>, id: String, keys: Vec<String>) -> CmdResult<Vec<forge_core::cache::ProductRow>> {
+async fn rows(state: State<'_, AppState>, id: String, keys: Vec<String>) -> CmdResult<Vec<storegenie_core::cache::ProductRow>> {
     let s = state.store(&id).await?;
     let c = s.cache.lock().unwrap();
     c.rows(&keys).map_err(err)
@@ -268,7 +268,7 @@ async fn skus(state: State<'_, AppState>, id: String) -> CmdResult<Vec<(String, 
 }
 
 #[tauri::command]
-async fn variations(state: State<'_, AppState>, id: String, parent_key: String) -> CmdResult<Vec<forge_core::cache::ProductRow>> {
+async fn variations(state: State<'_, AppState>, id: String, parent_key: String) -> CmdResult<Vec<storegenie_core::cache::ProductRow>> {
     let s = state.store(&id).await?;
     let c = s.cache.lock().unwrap();
     let keys = c.variation_keys(&parent_key).map_err(err)?;
@@ -293,7 +293,7 @@ async fn taxonomy(state: State<'_, AppState>, id: String) -> CmdResult<Value> {
 }
 
 #[tauri::command]
-async fn media(state: State<'_, AppState>, id: String) -> CmdResult<Vec<forge_core::model::Media>> {
+async fn media(state: State<'_, AppState>, id: String) -> CmdResult<Vec<storegenie_core::model::Media>> {
     let s = state.store(&id).await?;
     let c = s.cache.lock().unwrap();
     c.all_media().map_err(err)
@@ -355,7 +355,7 @@ async fn summary(state: State<'_, AppState>, id: String) -> CmdResult<StagedSumm
 }
 
 #[tauri::command]
-async fn changes(state: State<'_, AppState>, id: String) -> CmdResult<Vec<forge_core::cache::StagedChange>> {
+async fn changes(state: State<'_, AppState>, id: String) -> CmdResult<Vec<storegenie_core::cache::StagedChange>> {
     let s = state.store(&id).await?;
     let c = s.cache.lock().unwrap();
     c.changes().map_err(err)
@@ -377,14 +377,14 @@ async fn push(app: AppHandle, state: State<'_, AppState>, id: String, label: Str
 }
 
 #[tauri::command]
-async fn history(state: State<'_, AppState>, id: String) -> CmdResult<Vec<forge_core::cache::HistoryEntry>> {
+async fn history(state: State<'_, AppState>, id: String) -> CmdResult<Vec<storegenie_core::cache::HistoryEntry>> {
     let s = state.store(&id).await?;
     let c = s.cache.lock().unwrap();
     c.history(200).map_err(err)
 }
 
 #[tauri::command]
-async fn history_items(state: State<'_, AppState>, id: String, history_id: i64) -> CmdResult<Vec<forge_core::cache::HistoryItem>> {
+async fn history_items(state: State<'_, AppState>, id: String, history_id: i64) -> CmdResult<Vec<storegenie_core::cache::HistoryItem>> {
     let s = state.store(&id).await?;
     let c = s.cache.lock().unwrap();
     c.history_items(history_id).map_err(err)
@@ -417,25 +417,25 @@ async fn two_stores(state: &AppState, src: &str, dst: &str) -> CmdResult<(Arc<Op
 }
 
 #[tauri::command]
-async fn migration_preview(state: State<'_, AppState>, src: String, dst: String, opts: forge_core::migrate::MigrateOptions) -> CmdResult<forge_core::migrate::MigrationSummary> {
+async fn migration_preview(state: State<'_, AppState>, src: String, dst: String, opts: storegenie_core::migrate::MigrateOptions) -> CmdResult<storegenie_core::migrate::MigrationSummary> {
     let (a, b) = two_stores(&state, &src, &dst).await?;
     let (ac, bc) = (a.cache.lock().unwrap(), b.cache.lock().unwrap());
-    forge_core::migrate::plan(&ac, &src, &bc, &opts).map(|(s, _)| s).map_err(err)
+    storegenie_core::migrate::plan(&ac, &src, &bc, &opts).map(|(s, _)| s).map_err(err)
 }
 
 #[tauri::command]
-async fn migration_stage(state: State<'_, AppState>, src: String, dst: String, opts: forge_core::migrate::MigrateOptions) -> CmdResult<forge_core::migrate::MigrationSummary> {
+async fn migration_stage(state: State<'_, AppState>, src: String, dst: String, opts: storegenie_core::migrate::MigrateOptions) -> CmdResult<storegenie_core::migrate::MigrationSummary> {
     let (a, b) = two_stores(&state, &src, &dst).await?;
     let ac = a.cache.lock().unwrap();
     let mut bc = b.cache.lock().unwrap();
-    forge_core::migrate::stage(&ac, &src, &mut bc, &opts).map_err(err)
+    storegenie_core::migrate::stage(&ac, &src, &mut bc, &opts).map_err(err)
 }
 
 #[tauri::command]
-async fn migration_verify(state: State<'_, AppState>, src: String, dst: String, opts: forge_core::migrate::MigrateOptions) -> CmdResult<forge_core::migrate::VerifyReport> {
+async fn migration_verify(state: State<'_, AppState>, src: String, dst: String, opts: storegenie_core::migrate::MigrateOptions) -> CmdResult<storegenie_core::migrate::VerifyReport> {
     let (a, b) = two_stores(&state, &src, &dst).await?;
     let (ac, bc) = (a.cache.lock().unwrap(), b.cache.lock().unwrap());
-    forge_core::migrate::verify(&ac, &bc, &opts).map_err(err)
+    storegenie_core::migrate::verify(&ac, &bc, &opts).map_err(err)
 }
 
 #[tauri::command]
@@ -464,7 +464,7 @@ fn scan_paths(paths: Vec<String>) -> Vec<LocalFileInfo> {
     let mut out = Vec::new();
     for p in paths {
         let path = PathBuf::from(&p);
-        let files = if path.is_dir() { forge_core::media::scan_folder(&path) } else { vec![path] };
+        let files = if path.is_dir() { storegenie_core::media::scan_folder(&path) } else { vec![path] };
         for f in files {
             let size = std::fs::metadata(&f).map(|m| m.len()).unwrap_or(0);
             out.push(LocalFileInfo { name: f.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(), path: f.to_string_lossy().into_owned(), size });
@@ -519,7 +519,7 @@ async fn catalogue_image(src: String, max: u32, quality: u8) -> CmdResult<tauri:
     } else {
         tokio::fs::read(&src).await.map_err(err)?
     };
-    let jpeg = tokio::task::spawn_blocking(move || forge_core::media::print_jpeg(&bytes, max.clamp(64, 4000), quality)).await.map_err(err)?.map_err(err)?;
+    let jpeg = tokio::task::spawn_blocking(move || storegenie_core::media::print_jpeg(&bytes, max.clamp(64, 4000), quality)).await.map_err(err)?.map_err(err)?;
     Ok(tauri::ipc::Response::new(jpeg))
 }
 
@@ -578,7 +578,7 @@ fn set_media_settings(state: State<'_, AppState>, settings: MediaSettings) -> Cm
 mod tests {
     #[test]
     fn resolves_image_locations_with_or_without_extension() {
-        let dir = std::env::temp_dir().join(format!("cf-resolve-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("sg-resolve-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(dir.join("shoe-1.jpg"), b"x").unwrap();
         let p = |n: &str| dir.join(n).to_string_lossy().into_owned();
@@ -600,7 +600,40 @@ mod tests {
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
+/// Before the rename to StoreGenie Pro the app's folders were named after its old identifier.
+/// On first launch they are moved to the new name (stores, caches, settings and, on Windows,
+/// the web view's saved preferences), so nothing has to be set up again.
+fn migrate_old_app_folders() {
+    const OLD: &str = "com.catalogforge.desktop";
+    const NEW: &str = "com.storegenie.pro";
+    for base in [dirs::data_dir(), dirs::data_local_dir(), dirs::config_dir(), dirs::cache_dir()].into_iter().flatten() {
+        let (old, new) = (base.join(OLD), base.join(NEW));
+        if !old.is_dir() || new.exists() {
+            continue;
+        }
+        if std::fs::rename(&old, &new).is_err() {
+            // Different drive or a file in use: copy instead and leave the old folder alone.
+            let _ = copy_dir(&old, &new);
+        }
+    }
+}
+
+fn copy_dir(from: &std::path::Path, to: &std::path::Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(to)?;
+    for entry in std::fs::read_dir(from)? {
+        let entry = entry?;
+        let target = to.join(entry.file_name());
+        if entry.file_type()?.is_dir() {
+            copy_dir(&entry.path(), &target)?;
+        } else {
+            std::fs::copy(entry.path(), target)?;
+        }
+    }
+    Ok(())
+}
+
 pub fn run() {
+    migrate_old_app_folders();
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
@@ -610,8 +643,8 @@ pub fn run() {
                 .path()
                 .resource_dir()
                 .ok()
-                .map(|r| forge_core::drivers::local::bundled_plugin_dir(&r))
-                .filter(|p| p.join("catalogforge-connector.php").exists());
+                .map(|r| storegenie_core::drivers::local::bundled_plugin_dir(&r))
+                .filter(|p| p.join("storegenie-connector.php").exists());
             let settings = std::fs::read(data_dir.join("media-settings.json")).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default();
             app.manage(AppState {
                 profiles: ProfileStore::new(&data_dir),

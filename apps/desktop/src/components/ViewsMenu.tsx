@@ -100,7 +100,7 @@ export function ViewsMenu({ state, onChange, builtIns, allColumns, columnIds }: 
                   {r.own && (
                     <>
                       <button onClick={() => setRenaming(r.id)} className="rounded p-1 text-muted opacity-60 hover:bg-panel hover:text-fg group-hover:opacity-100" title="Rename" aria-label={`Rename ${r.name}`}><Pencil size={12} /></button>
-                      <button onClick={() => window.confirm(`Delete the view “${r.name}”? Your products aren't affected.`) && onChange(deleteView(state, r.id))} className="cf-close rounded p-1 opacity-60 group-hover:opacity-100" title="Delete view" aria-label={`Delete ${r.name}`}><Trash2 size={12} /></button>
+                      <button onClick={() => window.confirm(`Delete the view “${r.name}”? Your products aren't affected.`) && onChange(deleteView(state, r.id))} className="sg-close rounded p-1 opacity-60 group-hover:opacity-100" title="Delete view" aria-label={`Delete ${r.name}`}><Trash2 size={12} /></button>
                     </>
                   )}
                 </div>

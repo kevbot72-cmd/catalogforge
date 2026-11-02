@@ -11,7 +11,7 @@ const SHEET_EXT = ["csv", "tsv", "txt", "xlsx", "xls", "ods", "json"];
 
 function loadProfiles(): Record<string, ImportConfig & { signature: string }> {
   try {
-    return JSON.parse(localStorage.getItem("cf.importProfiles") ?? "{}");
+    return JSON.parse(localStorage.getItem("sg.importProfiles") ?? "{}");
   } catch {
     return {};
   }
@@ -317,7 +317,7 @@ export function ImportWizard() {
               const all = loadProfiles();
               all[profileName] = { ...cfg, signature: sheet.columns.join("|").toLowerCase() };
               try {
-                localStorage.setItem("cf.importProfiles", JSON.stringify(all));
+                localStorage.setItem("sg.importProfiles", JSON.stringify(all));
               } catch {
                 /* ignore */
               }

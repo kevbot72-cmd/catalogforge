@@ -49,6 +49,8 @@ const META_KEYS: &[&str] = &[
     "_sold_individually", "_purchase_note", "_upsell_ids", "_crosssell_ids",
     "_yoast_wpseo_title", "_yoast_wpseo_metadesc", "_yoast_wpseo_focuskw",
     "rank_math_title", "rank_math_description", "rank_math_focus_keyword",
+    "_sg_seo_title", "_sg_seo_description", "_sg_focus_keyword",
+    // Names used before the rename to StoreGenie Pro (the plugin renames them on its first run).
     "_cf_seo_title", "_cf_seo_description", "_cf_focus_keyword",
 ];
 
@@ -101,7 +103,11 @@ impl MysqlDriver {
             Some(u) => u.trim_end_matches('/').to_string(),
             None => format!("{}/wp-content/uploads", siteurl.trim_end_matches('/')),
         };
-        d.placeholder = d.option("catalogforge_preview_placeholder").await?.and_then(|v| v.parse().ok()).unwrap_or(0);
+        d.placeholder = match d.option("storegenie_preview_placeholder").await? {
+            Some(v) => v.parse().ok(),
+            None => d.option("catalogforge_preview_placeholder").await?.and_then(|v| v.parse().ok()),
+        }
+        .unwrap_or(0);
         let rows = sqlx::query(&format!("SELECT attribute_name, attribute_label FROM {}woocommerce_attribute_taxonomies", d.p))
             .fetch_all(&d.pool)
             .await
@@ -316,9 +322,9 @@ impl MysqlDriver {
                 external_url: get("_product_url"),
                 button_text: get("_button_text"),
                 permalink: if is_var { String::new() } else { format!("{}/?p={id}", self.home) },
-                seo_title: if is_var { String::new() } else { first_nonempty(&["_yoast_wpseo_title", "rank_math_title", "_cf_seo_title"]) },
-                seo_description: if is_var { String::new() } else { first_nonempty(&["_yoast_wpseo_metadesc", "rank_math_description", "_cf_seo_description"]) },
-                focus_keyword: if is_var { String::new() } else { first_nonempty(&["_yoast_wpseo_focuskw", "rank_math_focus_keyword", "_cf_focus_keyword"]) },
+                seo_title: if is_var { String::new() } else { first_nonempty(&["_yoast_wpseo_title", "rank_math_title", "_sg_seo_title", "_cf_seo_title"]) },
+                seo_description: if is_var { String::new() } else { first_nonempty(&["_yoast_wpseo_metadesc", "rank_math_description", "_sg_seo_description", "_cf_seo_description"]) },
+                focus_keyword: if is_var { String::new() } else { first_nonempty(&["_yoast_wpseo_focuskw", "rank_math_focus_keyword", "_sg_focus_keyword", "_cf_focus_keyword"]) },
                 date_created_gmt: post_date.as_deref().and_then(iso),
                 date_modified_gmt: modified.as_deref().and_then(iso),
                 meta: custom.iter().filter_map(|k| m.get(k).map(|v| (k.clone(), Value::String(v.clone())))).collect(),
@@ -342,7 +348,7 @@ impl MysqlDriver {
             .await?;
         let meta_rows = sqlx::query(&format!(
             "SELECT post_id, meta_key, meta_value FROM {p}postmeta WHERE post_id IN ({list})
-             AND meta_key IN ('_wp_attached_file','_wp_attachment_metadata','_wp_attachment_image_alt','_cf_sha256')"
+             AND meta_key IN ('_wp_attached_file','_wp_attachment_metadata','_wp_attachment_image_alt','_sg_sha256','_cf_sha256')"
         ))
         .fetch_all(&self.pool)
         .await?;
@@ -370,7 +376,7 @@ impl MysqlDriver {
                 mime: r.get(2),
                 width: md["width"].as_i64().unwrap_or(0),
                 height: md["height"].as_i64().unwrap_or(0),
-                sha256: m.get("_cf_sha256").cloned().unwrap_or_default(),
+                sha256: m.get("_sg_sha256").or_else(|| m.get("_cf_sha256")).cloned().unwrap_or_default(),
                 parent_id: r.get::<u64, _>(3) as i64,
             });
         }
@@ -477,7 +483,7 @@ impl Driver for MysqlDriver {
         let cat_ids: Vec<i64> = term_rows.iter().filter(|r| r.get::<String, _>(3) == "product_cat").map(|r| r.get::<u64, _>(0) as i64).collect();
         let tm_rows = sqlx::query(&format!(
             "SELECT term_id, meta_key, meta_value FROM {p}termmeta WHERE term_id IN ({}) AND meta_key IN
-             ('display_type','thumbnail_id','_cf_banner_id','order','rank_math_title','rank_math_description','_cf_seo_title','_cf_seo_description')",
+             ('display_type','thumbnail_id','_sg_banner_id','order','rank_math_title','rank_math_description','_sg_seo_title','_sg_seo_description','_cf_banner_id','_cf_seo_title','_cf_seo_description')",
             Self::id_list(&cat_ids)
         ))
         .fetch_all(&self.pool)
@@ -505,10 +511,10 @@ impl Driver for MysqlDriver {
                         count: r.get::<i64, _>(6),
                         display_type: g("display_type"),
                         image_id: g("thumbnail_id").parse().unwrap_or(0),
-                        banner_id: g("_cf_banner_id").parse().unwrap_or(0),
+                        banner_id: [g("_sg_banner_id"), g("_cf_banner_id")].into_iter().find(|s| !s.is_empty()).unwrap_or_default().parse().unwrap_or(0),
                         menu_order: g("order").parse().unwrap_or(0),
-                        seo_title: [g("rank_math_title"), g("_cf_seo_title")].into_iter().find(|s| !s.is_empty()).unwrap_or_default(),
-                        seo_description: [g("rank_math_description"), g("_cf_seo_description")].into_iter().find(|s| !s.is_empty()).unwrap_or_default(),
+                        seo_title: [g("rank_math_title"), g("_sg_seo_title"), g("_cf_seo_title")].into_iter().find(|s| !s.is_empty()).unwrap_or_default(),
+                        seo_description: [g("rank_math_description"), g("_sg_seo_description"), g("_cf_seo_description")].into_iter().find(|s| !s.is_empty()).unwrap_or_default(),
                     };
                     media_ids.extend([c.image_id, c.banner_id].into_iter().filter(|i| *i > 0));
                     tax.categories.push(c);

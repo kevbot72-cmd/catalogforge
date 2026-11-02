@@ -40,14 +40,14 @@ export interface Appearance {
 
 export const DEFAULT_APPEARANCE: Appearance = { theme: "indigo", custom: "#db2777", mode: "system", close: "b", density: "comfortable", corners: "soft", text: "normal" };
 
-const KEY = "cf.appearance";
+const KEY = "sg.appearance";
 
 export function loadAppearance(): Appearance {
   let saved: Partial<Appearance> = {};
   try {
     saved = JSON.parse(localStorage.getItem(KEY) ?? "{}");
     // Before 0.5.0 only dark mode was remembered.
-    const dark = localStorage.getItem("cf.dark");
+    const dark = localStorage.getItem("sg.dark");
     if (!saved.mode && dark !== null) saved.mode = dark === "1" ? "dark" : "light";
   } catch {
     /* storage unavailable: defaults */

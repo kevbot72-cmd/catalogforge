@@ -7,7 +7,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-class CF_Serializer {
+class SG_Serializer {
 
 	/**
 	 * SEO fields are normalised so the app has one column regardless of the SEO plugin in use.
@@ -28,9 +28,9 @@ class CF_Serializer {
 		if ( empty( $map ) ) {
 			// No SEO plugin: keep values in our own keys so nothing typed in the app is lost.
 			$map = array(
-				'seo_title'       => array( '_cf_seo_title' ),
-				'seo_description' => array( '_cf_seo_description' ),
-				'focus_keyword'   => array( '_cf_focus_keyword' ),
+				'seo_title'       => array( '_sg_seo_title' ),
+				'seo_description' => array( '_sg_seo_description' ),
+				'focus_keyword'   => array( '_sg_focus_keyword' ),
 			);
 		}
 		return $map;
@@ -173,7 +173,7 @@ class CF_Serializer {
 			'count'        => (int) $raw_count,
 			'display_type' => (string) get_term_meta( $t->term_id, 'display_type', true ),
 			'image_id'     => (int) get_term_meta( $t->term_id, 'thumbnail_id', true ),
-			'banner_id'    => (int) get_term_meta( $t->term_id, '_cf_banner_id', true ),
+			'banner_id'    => (int) get_term_meta( $t->term_id, '_sg_banner_id', true ),
 			'menu_order'   => (int) get_term_meta( $t->term_id, 'order', true ),
 		);
 		$seo_title = '';
@@ -182,8 +182,8 @@ class CF_Serializer {
 			$seo_title = (string) get_term_meta( $t->term_id, 'rank_math_title', true );
 			$seo_desc  = (string) get_term_meta( $t->term_id, 'rank_math_description', true );
 		} else {
-			$seo_title = (string) get_term_meta( $t->term_id, '_cf_seo_title', true );
-			$seo_desc  = (string) get_term_meta( $t->term_id, '_cf_seo_description', true );
+			$seo_title = (string) get_term_meta( $t->term_id, '_sg_seo_title', true );
+			$seo_desc  = (string) get_term_meta( $t->term_id, '_sg_seo_description', true );
 		}
 		$out['seo_title']       = $seo_title;
 		$out['seo_description'] = $seo_desc;
@@ -209,7 +209,7 @@ class CF_Serializer {
 			'mime'      => $post->post_mime_type,
 			'width'     => isset( $meta['width'] ) ? (int) $meta['width'] : 0,
 			'height'    => isset( $meta['height'] ) ? (int) $meta['height'] : 0,
-			'sha256'    => (string) get_post_meta( $id, '_cf_sha256', true ),
+			'sha256'    => (string) get_post_meta( $id, '_sg_sha256', true ),
 			'parent_id' => (int) $post->post_parent,
 		);
 	}

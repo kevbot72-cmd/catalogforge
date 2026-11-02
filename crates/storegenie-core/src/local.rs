@@ -70,7 +70,7 @@ impl LocalSite {
 }
 
 pub fn default_data_dir() -> Option<PathBuf> {
-    if let Ok(dir) = std::env::var("CATALOGFORGE_LOCAL_DATA_DIR") {
+    if let Ok(dir) = std::env::var("STOREGENIE_LOCAL_DATA_DIR").or_else(|_| std::env::var("CATALOGFORGE_LOCAL_DATA_DIR")) {
         return Some(PathBuf::from(dir));
     }
     #[cfg(target_os = "macos")]
@@ -162,7 +162,7 @@ pub fn discover(data_dir: &Path) -> Result<Vec<LocalSite>> {
             status,
             table_prefix: table_prefix_from_config(&wp_root).unwrap_or_else(|| "wp_".into()),
             has_woocommerce: wp_root.join("wp-content/plugins/woocommerce/woocommerce.php").exists(),
-            connector_installed: wp_root.join("wp-content/plugins/catalogforge-connector/catalogforge-connector.php").exists(),
+            connector_installed: wp_root.join("wp-content/plugins/storegenie-connector/storegenie-connector.php").exists(),
             multisite: site.get("multiSite").and_then(Value::as_str).map(|s| !s.is_empty()).unwrap_or(false),
             path,
             wp_root,
@@ -204,7 +204,7 @@ pub async fn start_site(data_dir: &Path, id: &str) -> Result<()> {
 
 /// Copies the bundled connector plugin into the site.
 pub fn install_connector_files(site: &LocalSite, plugin_src: &Path) -> Result<()> {
-    let dest = site.plugins_dir().join("catalogforge-connector");
+    let dest = site.plugins_dir().join("storegenie-connector");
     if let (Ok(a), Ok(b)) = (std::fs::canonicalize(&dest), std::fs::canonicalize(plugin_src)) {
         if a == b {
             return Ok(()); // Already the same directory (e.g. a development symlink).
@@ -283,7 +283,7 @@ mod tests {
         let site = find_site(dir.path(), "aB3dE").unwrap();
         let src = dir.path().join("plugin");
         std::fs::create_dir_all(src.join("includes")).unwrap();
-        std::fs::write(src.join("catalogforge-connector.php"), "<?php").unwrap();
+        std::fs::write(src.join("storegenie-connector.php"), "<?php").unwrap();
         std::fs::write(src.join("includes/a.php"), "<?php").unwrap();
         install_connector_files(&site, &src).unwrap();
         assert!(find_site(dir.path(), "aB3dE").unwrap().connector_installed);

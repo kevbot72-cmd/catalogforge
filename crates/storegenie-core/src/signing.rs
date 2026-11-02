@@ -1,5 +1,5 @@
 //! Request signing for the connector plugin. Must stay byte-for-byte compatible with
-//! `CF_Auth::canonical_string()` in the plugin.
+//! `SG_Auth::canonical_string()` in the plugin.
 
 use hmac::{Hmac, Mac};
 use percent_encoding::{utf8_percent_encode, AsciiSet, NON_ALPHANUMERIC};
@@ -52,7 +52,7 @@ pub fn nonce() -> String {
     rand::thread_rng().sample_iter(&Alphanumeric).take(24).map(char::from).collect()
 }
 
-/// Decoded `cf1.` connection string produced by the plugin's admin screen.
+/// Decoded `sg1.` connection string produced by the plugin's admin screen.
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize, PartialEq)]
 pub struct ConnectionString {
     pub v: i64,
@@ -65,7 +65,8 @@ pub struct ConnectionString {
 pub fn parse_connection_string(s: &str) -> anyhow::Result<ConnectionString> {
     use base64::Engine;
     let s = s.trim();
-    let body = s.strip_prefix("cf1.").ok_or_else(|| anyhow::anyhow!("Connection strings start with \"cf1.\" — copy it from Tools → StoreGenie Pro in wp-admin."))?;
+    // "cf1." strings come from the plugin under its old name (CatalogForge Connector).
+    let body = s.strip_prefix("sg1.").or_else(|| s.strip_prefix("cf1.")).ok_or_else(|| anyhow::anyhow!("Connection strings start with \"sg1.\" — copy it from Tools → StoreGenie Pro in wp-admin."))?;
     let raw = base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(body.trim_end_matches('='))?;
     Ok(serde_json::from_slice(&raw)?)
 }
@@ -92,8 +93,8 @@ mod tests {
 
     #[test]
     fn signature_is_stable() {
-        let c = canonical_string(1700000000, "abc12345", "get", "/catalogforge/v1/handshake", "", b"", "");
-        assert!(c.starts_with("1700000000\nabc12345\nGET\n/catalogforge/v1/handshake\n\n"));
+        let c = canonical_string(1700000000, "abc12345", "get", "/storegenie/v1/handshake", "", b"", "");
+        assert!(c.starts_with("1700000000\nabc12345\nGET\n/storegenie/v1/handshake\n\n"));
         // HMAC-SHA256("secret", c) computed with PHP hash_hmac.
         assert_eq!(sign("secret", &c).len(), 64);
         assert_eq!(sign("secret", &c), sign("secret", &c));
@@ -102,10 +103,13 @@ mod tests {
     #[test]
     fn parses_connection_string() {
         use base64::Engine;
-        let json = r#"{"v":1,"url":"https://shop.test/","rest":"https://shop.test/wp-json/","key":"cf_x","secret":"s"}"#;
-        let s = format!("cf1.{}", base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(json));
+        let json = r#"{"v":1,"url":"https://shop.test/","rest":"https://shop.test/wp-json/","key":"sg_x","secret":"s"}"#;
+        let s = format!("sg1.{}", base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(json));
         let c = parse_connection_string(&s).unwrap();
-        assert_eq!(c.key, "cf_x");
+        assert_eq!(c.key, "sg_x");
+        // Strings copied from the plugin under its old name still work.
+        let old = format!("cf1.{}", base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(json));
+        assert_eq!(parse_connection_string(&old).unwrap().key, "sg_x");
         assert!(parse_connection_string("nope").is_err());
     }
 }

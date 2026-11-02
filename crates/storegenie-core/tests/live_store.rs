@@ -1,18 +1,18 @@
 //! Integration tests against a real WordPress + WooCommerce store with the connector active.
-//! Skipped unless CF_TEST_URL is set:
+//! Skipped unless SG_TEST_URL is set:
 //!
-//!   CF_TEST_URL=http://127.0.0.1:8088 CF_TEST_KEY=… CF_TEST_SECRET=… \
-//!   CF_TEST_DB_HOST=127.0.0.1 CF_TEST_DB_PORT=3306 CF_TEST_DB_USER=wp CF_TEST_DB_PASS=wp CF_TEST_DB_NAME=wpstore \
-//!   CF_TEST_WP_ROOT=/path/to/wordpress cargo test -p forge-core --test live_store -- --test-threads=1 --nocapture
+//!   SG_TEST_URL=http://127.0.0.1:8088 SG_TEST_KEY=… SG_TEST_SECRET=… \
+//!   SG_TEST_DB_HOST=127.0.0.1 SG_TEST_DB_PORT=3306 SG_TEST_DB_USER=wp SG_TEST_DB_PASS=wp SG_TEST_DB_NAME=wpstore \
+//!   SG_TEST_WP_ROOT=/path/to/wordpress cargo test -p storegenie-core --test live_store -- --test-threads=1 --nocapture
 
-use forge_core::cache::{Cache, Edit, ProductQuery};
-use forge_core::drivers::connector::ConnectorDriver;
-use forge_core::drivers::local::LocalDriver;
-use forge_core::drivers::mysql::{MysqlDriver, MysqlTarget};
-use forge_core::drivers::Driver;
-use forge_core::media::MediaSettings;
-use forge_core::model::*;
-use forge_core::sync::{self, no_progress};
+use storegenie_core::cache::{Cache, Edit, ProductQuery};
+use storegenie_core::drivers::connector::ConnectorDriver;
+use storegenie_core::drivers::local::LocalDriver;
+use storegenie_core::drivers::mysql::{MysqlDriver, MysqlTarget};
+use storegenie_core::drivers::Driver;
+use storegenie_core::media::MediaSettings;
+use storegenie_core::model::*;
+use storegenie_core::sync::{self, no_progress};
 use serde_json::{json, Value};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
@@ -22,17 +22,17 @@ fn env(k: &str) -> Option<String> {
 }
 
 fn connector() -> Option<ConnectorDriver> {
-    Some(ConnectorDriver::for_local(&env("CF_TEST_URL")?, &env("CF_TEST_KEY")?, &env("CF_TEST_SECRET")?, None).unwrap())
+    Some(ConnectorDriver::for_local(&env("SG_TEST_URL")?, &env("SG_TEST_KEY")?, &env("SG_TEST_SECRET")?, None).unwrap())
 }
 
 fn mysql_target() -> MysqlTarget {
     MysqlTarget {
-        host: env("CF_TEST_DB_HOST").unwrap_or("127.0.0.1".into()),
-        port: env("CF_TEST_DB_PORT").and_then(|p| p.parse().ok()).unwrap_or(3306),
+        host: env("SG_TEST_DB_HOST").unwrap_or("127.0.0.1".into()),
+        port: env("SG_TEST_DB_PORT").and_then(|p| p.parse().ok()).unwrap_or(3306),
         socket: None,
-        user: env("CF_TEST_DB_USER").unwrap_or("wp".into()),
-        password: env("CF_TEST_DB_PASS").unwrap_or("wp".into()),
-        database: env("CF_TEST_DB_NAME").unwrap_or("wpstore".into()),
+        user: env("SG_TEST_DB_USER").unwrap_or("wp".into()),
+        password: env("SG_TEST_DB_PASS").unwrap_or("wp".into()),
+        database: env("SG_TEST_DB_NAME").unwrap_or("wpstore".into()),
         table_prefix: "wp_".into(),
     }
 }
@@ -56,7 +56,7 @@ fn test_image(path: &std::path::Path, seed: u32) {
 
 #[tokio::test]
 async fn full_cycle_pull_stage_push_conflict_revert() {
-    let Some(driver) = connector() else { return eprintln!("CF_TEST_URL not set; skipping") };
+    let Some(driver) = connector() else { return eprintln!("SG_TEST_URL not set; skipping") };
     let tmp = tempfile::tempdir().unwrap();
     let cache = Mutex::new(Cache::open(&tmp.path().join("c.db")).unwrap());
 
@@ -229,7 +229,7 @@ async fn mysql_reader_matches_connector() {
 
 #[tokio::test]
 async fn local_adapter_provisions_and_writes_media_to_disk() {
-    let (Some(url), Some(wp_root)) = (env("CF_TEST_URL"), env("CF_TEST_WP_ROOT")) else { return };
+    let (Some(url), Some(wp_root)) = (env("SG_TEST_URL"), env("SG_TEST_WP_ROOT")) else { return };
     // Build a fake Local data directory whose site points at the test WordPress install.
     let tmp = tempfile::tempdir().unwrap();
     let site_path = tmp.path().join("Local Sites/test-store");
@@ -248,21 +248,21 @@ async fn local_adapter_provisions_and_writes_media_to_disk() {
         .to_string(),
     )
     .unwrap();
-    let site = forge_core::local::find_site(tmp.path(), "lcl1").unwrap();
-    assert_eq!(site.status, forge_core::local::SiteStatus::Running);
+    let site = storegenie_core::local::find_site(tmp.path(), "lcl1").unwrap();
+    assert_eq!(site.status, storegenie_core::local::SiteStatus::Running);
     assert!(site.has_woocommerce && site.connector_installed);
 
     // Deactivate the plugin and forget keys so the adapter has to provision from scratch.
     let my = MysqlDriver::connect(&t, None).await.unwrap();
     let raw = my.option("active_plugins").await.unwrap().unwrap();
-    let mut list = forge_core::phpser::parse_string_list(&raw).unwrap();
-    list.retain(|p| !p.starts_with("catalogforge-connector/"));
-    my.set_option("active_plugins", &forge_core::phpser::serialize_string_list(&list), true).await.unwrap();
+    let mut list = storegenie_core::phpser::parse_string_list(&raw).unwrap();
+    list.retain(|p| !p.starts_with("storegenie-connector/"));
+    my.set_option("active_plugins", &storegenie_core::phpser::serialize_string_list(&list), true).await.unwrap();
 
     let (driver, key) = LocalDriver::open(site.clone(), None, None).await.unwrap();
-    assert!(key.key.starts_with("cf_local_"));
+    assert!(key.key.starts_with("sg_local_"));
     let raw = my.option("active_plugins").await.unwrap().unwrap();
-    assert!(raw.contains("catalogforge-connector/catalogforge-connector.php"), "plugin re-activated");
+    assert!(raw.contains("storegenie-connector/storegenie-connector.php"), "plugin re-activated");
     let hs = driver.handshake().await.expect("signed request with auto-provisioned key");
     assert!(hs.wc_version.is_some());
 
@@ -273,7 +273,7 @@ async fn local_adapter_provisions_and_writes_media_to_disk() {
     // Media goes straight to disk and is only registered over HTTP.
     let img = tmp.path().join("local.png");
     test_image(&img, rand::random());
-    let prepared = forge_core::media::prepare_file(&img, &format!("local-{}", sfx()), &hs.image_sizes, &MediaSettings::default()).unwrap();
+    let prepared = storegenie_core::media::prepare_file(&img, &format!("local-{}", sfx()), &hs.image_sizes, &MediaSettings::default()).unwrap();
     let up = driver.upload_media(&prepared, &Default::default()).await.unwrap();
     assert!(!up.deduplicated);
     let rel = up.media.url.split("/wp-content/uploads/").nth(1).unwrap().to_string();
@@ -303,7 +303,7 @@ async fn local_adapter_provisions_and_writes_media_to_disk() {
 #[tokio::test]
 async fn throughput_bulk_create_and_pull() {
     let Some(driver) = connector() else { return };
-    let n: usize = env("CF_TEST_BULK").and_then(|s| s.parse().ok()).unwrap_or(1000);
+    let n: usize = env("SG_TEST_BULK").and_then(|s| s.parse().ok()).unwrap_or(1000);
     let tmp = tempfile::tempdir().unwrap();
     let cache = Mutex::new(Cache::open(&tmp.path().join("c.db")).unwrap());
     sync::pull(&driver, &cache, true, no_progress()).await.unwrap();
@@ -342,9 +342,9 @@ async fn throughput_bulk_create_and_pull() {
 
 #[tokio::test]
 async fn custom_fields_discover_edit_push_and_conflict() {
-    let Some(driver) = connector() else { return eprintln!("CF_TEST_URL not set; skipping") };
+    let Some(driver) = connector() else { return eprintln!("SG_TEST_URL not set; skipping") };
     let s = sfx();
-    let (brand, qty) = (format!("cf_brand_{s}"), format!("cf_pack_qty_{s}"));
+    let (brand, qty) = (format!("sg_brand_{s}"), format!("sg_pack_qty_{s}"));
     let tmp = tempfile::tempdir().unwrap();
     let cache = Mutex::new(Cache::open(&tmp.path().join("c.db")).unwrap());
 
@@ -399,7 +399,7 @@ async fn custom_fields_discover_edit_push_and_conflict() {
 
 #[tokio::test]
 async fn media_delete_removes_attachment_and_cache_entry() {
-    let Some(driver) = connector() else { return eprintln!("CF_TEST_URL not set; skipping") };
+    let Some(driver) = connector() else { return eprintln!("SG_TEST_URL not set; skipping") };
     let tmp = tempfile::tempdir().unwrap();
     let cache = Mutex::new(Cache::open(&tmp.path().join("c.db")).unwrap());
     let img = tmp.path().join("doomed.png");
@@ -433,7 +433,7 @@ async fn media_delete_removes_attachment_and_cache_entry() {
 
 #[tokio::test]
 async fn formatted_descriptions_survive_a_push() {
-    let Some(driver) = connector() else { return eprintln!("CF_TEST_URL not set; skipping") };
+    let Some(driver) = connector() else { return eprintln!("SG_TEST_URL not set; skipping") };
     let tmp = tempfile::tempdir().unwrap();
     let cache = Mutex::new(Cache::open(&tmp.path().join("c.db")).unwrap());
     let s = sfx();
@@ -449,8 +449,8 @@ async fn formatted_descriptions_survive_a_push() {
 /// The edit panel's extra fields: linked products, brands, purchase note, one-per-order, reviews.
 #[tokio::test]
 async fn linked_products_brands_and_advanced_fields_round_trip() {
-    let Some(driver) = connector() else { return eprintln!("CF_TEST_URL not set; skipping") };
-    let Some(root) = env("CF_TEST_WP_ROOT") else { return };
+    let Some(driver) = connector() else { return eprintln!("SG_TEST_URL not set; skipping") };
+    let Some(root) = env("SG_TEST_WP_ROOT") else { return };
     let s = sfx();
     // A brand to tick (WooCommerce 9.6+ ships Brands).
     let out = std::process::Command::new("php")
@@ -501,14 +501,14 @@ async fn linked_products_brands_and_advanced_fields_round_trip() {
     assert!(tax.brands.iter().any(|t| t.id == brand), "brand listed in taxonomy");
 }
 
-/// Migrates the whole test catalogue into a second, empty store (CF_TEST2_*), then verifies it and
+/// Migrates the whole test catalogue into a second, empty store (SG_TEST2_*), then verifies it and
 /// checks that running it again creates nothing.
 #[tokio::test]
 async fn migrate_whole_store_into_empty_store() {
-    let (Some(src), Some(url2), Some(key2), Some(secret2)) = (connector(), env("CF_TEST2_URL"), env("CF_TEST2_KEY"), env("CF_TEST2_SECRET")) else {
-        return eprintln!("CF_TEST2_URL not set; skipping");
+    let (Some(src), Some(url2), Some(key2), Some(secret2)) = (connector(), env("SG_TEST2_URL"), env("SG_TEST2_KEY"), env("SG_TEST2_SECRET")) else {
+        return eprintln!("SG_TEST2_URL not set; skipping");
     };
-    use forge_core::migrate::{self, MigrateOptions};
+    use storegenie_core::migrate::{self, MigrateOptions};
     let dst = ConnectorDriver::for_local(&url2, &key2, &secret2, None).unwrap();
     let tmp = tempfile::tempdir().unwrap();
     let a = Mutex::new(Cache::open(&tmp.path().join("a.db")).unwrap());

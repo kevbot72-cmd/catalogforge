@@ -42,10 +42,10 @@ const LAYOUTS: [Layout, string, typeof LayoutGrid][] = [["grid", "Grid", LayoutG
 export function CatalogueView() {
   const { backend, storeId, info, taxonomy, toast } = useApp();
   const storeName = info?.handshake?.site_name || info?.profile.name || "Our store";
-  const designKey = `cf.catalogue.design.${storeId}`;
+  const designKey = `sg.catalogue.design.${storeId}`;
   const [design, setDesignState] = useState<CatalogueDesign>(() => upgrade(load(designKey, defaultDesign(storeName)), storeName));
-  const [saved, setSaved] = useState<Record<string, CatalogueDesign>>(() => load("cf.catalogue.designs", {}));
-  const [fonts, setFonts] = useState<FileFont[]>(() => load("cf.catalogue.fonts", []));
+  const [saved, setSaved] = useState<Record<string, CatalogueDesign>>(() => load("sg.catalogue.designs", {}));
+  const [fonts, setFonts] = useState<FileFont[]>(() => load("sg.catalogue.fonts", []));
   const [tab, setTab] = useState<Tab>("content");
   const [rows, setRows] = useState<ProductRow[] | null>(null);
   const [media, setMedia] = useState<Map<number, Media>>(new Map());
@@ -206,7 +206,7 @@ export function CatalogueView() {
     if (!f) return null;
     const next = [...fonts.filter((x) => x.path !== f.path), f];
     setFonts(next);
-    store("cf.catalogue.fonts", next);
+    store("sg.catalogue.fonts", next);
     return f;
   };
   const chooseTemplate = async () => {
@@ -229,7 +229,7 @@ export function CatalogueView() {
     if (!name) return;
     const next = { ...saved, [name]: { ...design, name } };
     setSaved(next);
-    store("cf.catalogue.designs", next);
+    store("sg.catalogue.designs", next);
     setDesign({ name });
     toast({ tone: "success", title: `Design “${name}” saved`, body: "Use it again for any store from the design menu." });
   };
@@ -266,7 +266,7 @@ export function CatalogueView() {
                 const next = { ...saved };
                 delete next[name];
                 setSaved(next);
-                store("cf.catalogue.designs", next);
+                store("sg.catalogue.designs", next);
               } else if (saved[v]) setDesign(() => upgrade(saved[v], storeName));
             }}
           >
@@ -550,7 +550,7 @@ function FilePickButton({ label, file, onPick, onClear }: { label: string; file:
   return file ? (
     <span className="flex h-8 items-center gap-1 rounded-md border border-line px-2 text-xs">
       <ImagePlus size={13} className="text-muted" /><span className="max-w-[110px] truncate">{file.name}</span>
-      <button onClick={onClear} className="cf-close rounded p-0.5" aria-label={`Remove ${label}`}><X size={12} /></button>
+      <button onClick={onClear} className="sg-close rounded p-0.5" aria-label={`Remove ${label}`}><X size={12} /></button>
     </span>
   ) : (
     <Button size="sm" icon={<ImagePlus size={13} />} onClick={onPick}>{label}…</Button>
@@ -569,7 +569,7 @@ function TextBlocks({ title, texts, onChange, fonts, addFont, hint, testId }: { 
               <label className="flex items-center gap-1.5 text-2xs text-muted">Position {Math.round(t.y)}%
                 <input type="range" min={0} max={97} value={t.y} onChange={(e) => update(i, { y: Number(e.target.value) })} className="w-24" aria-label={`${t.label} position`} />
               </label>
-              <button onClick={() => onChange(texts.filter((_, j) => j !== i))} className="cf-close rounded p-0.5" aria-label={`Remove ${t.label}`}><Trash2 size={13} /></button>
+              <button onClick={() => onChange(texts.filter((_, j) => j !== i))} className="sg-close rounded p-0.5" aria-label={`Remove ${t.label}`}><Trash2 size={13} /></button>
             </div>
             <TextArea value={t.text} rows={Math.min(4, t.text.split("\n").length + 1)} onChange={(e) => update(i, { text: e.target.value })} data-testid={`${testId ?? "texts"}-${t.id}`} />
             <TextStyleEditor value={t.style} onChange={(s) => update(i, { style: s })} fonts={fonts} onAddFont={addFont} />

@@ -247,7 +247,7 @@ pub fn plan(src: &Cache, src_store: &str, dst: &Cache, opts: &MigrateOptions) ->
                 }
             }
         }
-        f.insert(format!("{META_PREFIX}_cf_source"), json!(format!("{src_store}:{}", p.id)));
+        f.insert(format!("{META_PREFIX}_sg_source"), json!(format!("{src_store}:{}", p.id)));
         Ok(f)
     };
     for p in &parents {
@@ -330,7 +330,7 @@ pub fn plan(src: &Cache, src_store: &str, dst: &Cache, opts: &MigrateOptions) ->
     s.duplicate_skus.sort();
     s.tags = tags.len();
     s.attributes = attrs.into_iter().collect();
-    s.custom_fields = custom.into_iter().filter(|k| k != "_cf_source").collect();
+    s.custom_fields = custom.into_iter().filter(|k| k != "_sg_source").collect();
     s.images = images.len();
 
     /* ------------------------------------------------------------- warnings */

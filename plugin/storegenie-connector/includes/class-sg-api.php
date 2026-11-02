@@ -1,18 +1,20 @@
 <?php
 /**
- * REST routes under /catalogforge/v1. All routes require a valid StoreGenie Pro signature.
+ * REST routes under /storegenie/v1. All routes require a valid StoreGenie Pro signature.
  *
  * @package StoreGeniePro
  */
 
 defined( 'ABSPATH' ) || exit;
 
-class CF_Api {
+class SG_Api {
 
-	const NS = 'catalogforge/v1';
+	const NS = 'storegenie/v1';
+	/** Address used before the rename to StoreGenie Pro; kept so older apps keep working. */
+	const LEGACY_NS = 'catalogforge/v1';
 
 	public static function register_routes() {
-		$auth = array( 'CF_Auth', 'check' );
+		$auth = array( 'SG_Auth', 'check' );
 		$routes = array(
 			array( '/handshake', 'GET', array( __CLASS__, 'handshake' ) ),
 			array( '/index', 'GET', array( __CLASS__, 'index' ) ),
@@ -20,22 +22,24 @@ class CF_Api {
 			array( '/taxonomy', 'GET', array( __CLASS__, 'taxonomy' ) ),
 			array( '/meta-keys', 'GET', array( __CLASS__, 'meta_keys' ) ),
 			array( '/batch', 'POST', array( __CLASS__, 'batch' ) ),
-			array( '/media', 'GET', array( 'CF_Media', 'listing' ) ),
-			array( '/media', 'POST', array( 'CF_Media', 'upload' ) ),
-			array( '/media/register', 'POST', array( 'CF_Media', 'register' ) ),
-			array( '/media/sideload', 'POST', array( 'CF_Media', 'sideload' ) ),
-			array( '/preview', 'POST', array( 'CF_Preview', 'create' ) ),
+			array( '/media', 'GET', array( 'SG_Media', 'listing' ) ),
+			array( '/media', 'POST', array( 'SG_Media', 'upload' ) ),
+			array( '/media/register', 'POST', array( 'SG_Media', 'register' ) ),
+			array( '/media/sideload', 'POST', array( 'SG_Media', 'sideload' ) ),
+			array( '/preview', 'POST', array( 'SG_Preview', 'create' ) ),
 		);
-		foreach ( $routes as list( $path, $method, $cb ) ) {
-			register_rest_route(
-				self::NS,
-				$path,
-				array(
-					'methods'             => $method,
-					'callback'            => $cb,
-					'permission_callback' => $auth,
-				)
-			);
+		foreach ( array( self::NS, self::LEGACY_NS ) as $ns ) {
+			foreach ( $routes as list( $path, $method, $cb ) ) {
+				register_rest_route(
+					$ns,
+					$path,
+					array(
+						'methods'             => $method,
+						'callback'            => $cb,
+						'permission_callback' => $auth,
+					)
+				);
+			}
 		}
 	}
 
@@ -58,8 +62,8 @@ class CF_Api {
 			&& \Automattic\WooCommerce\Utilities\OrderUtil::custom_orders_table_usage_is_enabled();
 
 		return array(
-			'protocol'            => CATALOGFORGE_PROTOCOL,
-			'plugin_version'      => CATALOGFORGE_VERSION,
+			'protocol'            => STOREGENIE_PROTOCOL,
+			'plugin_version'      => STOREGENIE_VERSION,
 			'wp_version'          => $wp_version,
 			'wc_version'          => defined( 'WC_VERSION' ) ? WC_VERSION : null,
 			'php_version'         => PHP_VERSION,
@@ -109,7 +113,7 @@ class CF_Api {
 			 ORDER BY ID",
 			ARRAY_N
 		);
-		$placeholder = (int) get_option( 'catalogforge_preview_placeholder' );
+		$placeholder = (int) get_option( 'storegenie_preview_placeholder' );
 		$out         = array();
 		foreach ( $rows as $r ) {
 			if ( (int) $r[0] === $placeholder ) {
@@ -143,7 +147,7 @@ class CF_Api {
 			$where .= ' AND post_modified_gmt > %s';
 			$args[] = (string) $request->get_param( 'modified_after' );
 		}
-		$placeholder = (int) get_option( 'catalogforge_preview_placeholder' );
+		$placeholder = (int) get_option( 'storegenie_preview_placeholder' );
 		if ( $placeholder ) {
 			$where .= ' AND ID <> %d';
 			$args[] = $placeholder;
@@ -161,7 +165,7 @@ class CF_Api {
 			if ( ! $p ) {
 				continue;
 			}
-			$row        = CF_Serializer::product( $p, $meta_keys );
+			$row        = SG_Serializer::product( $p, $meta_keys );
 			$products[] = $row;
 			if ( $row['image_id'] ) {
 				$media_ids[] = $row['image_id'];
@@ -174,7 +178,7 @@ class CF_Api {
 		_prime_post_caches( $media_ids, false, true );
 		$media = array();
 		foreach ( $media_ids as $mid ) {
-			$m = CF_Serializer::media( $mid );
+			$m = SG_Serializer::media( $mid );
 			if ( $m ) {
 				$media[] = $m;
 			}
@@ -220,7 +224,7 @@ class CF_Api {
 		}
 		$cats = array();
 		foreach ( get_terms( array( 'taxonomy' => 'product_cat', 'hide_empty' => false ) ) as $t ) {
-			$cats[] = CF_Serializer::category( $t, $counts[ $t->term_taxonomy_id ] ?? 0 );
+			$cats[] = SG_Serializer::category( $t, $counts[ $t->term_taxonomy_id ] ?? 0 );
 		}
 		$tags = array();
 		foreach ( get_terms( array( 'taxonomy' => 'product_tag', 'hide_empty' => false ) ) as $t ) {
@@ -263,7 +267,7 @@ class CF_Api {
 		}
 		$media = array();
 		foreach ( array_unique( $media_ids ) as $mid ) {
-			$m = CF_Serializer::media( $mid );
+			$m = SG_Serializer::media( $mid );
 			if ( $m ) {
 				$media[] = $m;
 			}
@@ -280,15 +284,15 @@ class CF_Api {
 	}
 
 	public static function batch( WP_REST_Request $request ) {
-		$body = CF_Auth::json_body( $request );
+		$body = SG_Auth::json_body( $request );
 		if ( empty( $body['ops'] ) || ! is_array( $body['ops'] ) ) {
-			return new WP_Error( 'cf_batch', 'Body must contain an "ops" array.', array( 'status' => 400 ) );
+			return new WP_Error( 'sg_batch', 'Body must contain an "ops" array.', array( 'status' => 400 ) );
 		}
 		if ( count( $body['ops'] ) > 2000 ) {
-			return new WP_Error( 'cf_batch', 'At most 2000 operations per request.', array( 'status' => 413 ) );
+			return new WP_Error( 'sg_batch', 'At most 2000 operations per request.', array( 'status' => 413 ) );
 		}
 		wc_set_time_limit( 0 );
-		$writer = new CF_Writer( (array) ( $body['options'] ?? array() ) );
+		$writer = new SG_Writer( (array) ( $body['options'] ?? array() ) );
 		return $writer->run( $body['ops'] );
 	}
 }

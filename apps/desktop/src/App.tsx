@@ -72,7 +72,7 @@ function Toasts() {
             <div className="text-[13px] font-medium">{t.title}</div>
             {t.body && <div className="text-xs text-muted">{t.body}</div>}
           </div>
-          <button onClick={() => dismissToast(t.id)} className="cf-close rounded p-0.5" aria-label="Dismiss"><X size={14} /></button>
+          <button onClick={() => dismissToast(t.id)} className="sg-close rounded p-0.5" aria-label="Dismiss"><X size={14} /></button>
         </div>
       ))}
     </div>

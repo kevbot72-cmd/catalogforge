@@ -15,7 +15,7 @@ export function Splash() {
     if (!splash || pick) return;
     let last = "";
     try {
-      last = localStorage.getItem("cf.store") ?? "";
+      last = localStorage.getItem("sg.store") ?? "";
     } catch {
       /* no memory of the last store */
     }

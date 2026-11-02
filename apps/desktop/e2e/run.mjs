@@ -287,11 +287,11 @@ await step("export: dialog offers Excel/CSV and downloads a valid workbook", asy
 
 await step("custom fields: discover, pick, then edit in grid view and product tab", async () => {
   await page.getByTestId("nav-settings").click();
-  await page.getByTestId("cf-scan").click();
-  await page.getByTestId("cf-pick-brand").check();
-  await page.getByTestId("cf-pick-warranty_years").check();
+  await page.getByTestId("sg-scan").click();
+  await page.getByTestId("sg-pick-brand").check();
+  await page.getByTestId("sg-pick-warranty_years").check();
   await shot("16-custom-fields-settings");
-  await page.getByTestId("cf-save").click();
+  await page.getByTestId("sg-save").click();
   await page.getByText("Custom fields saved").waitFor();
   await onProducts();
   if ((await page.getByTestId("filter-changed").getAttribute("class")).includes("text-accent")) await page.getByTestId("filter-changed").click();
@@ -305,7 +305,7 @@ await step("custom fields: discover, pick, then edit in grid view and product ta
   await page.waitForTimeout(400);
   await page.getByTestId("palette").locator('[cmdk-item][data-value^="product"]').first().click();
   await page.getByRole("tab", { name: "Custom fields" }).click();
-  const brand = page.getByTestId("cf-brand");
+  const brand = page.getByTestId("sg-brand");
   await brand.fill("Acme Outdoor");
   await brand.press("Enter");
   await page.waitForTimeout(300);
@@ -772,7 +772,7 @@ await step("views: new view, rename, drag a column, kept after closing; delete",
   await page.mouse.up();
   await page.waitForTimeout(400);
   const order = () => page.evaluate(() => {
-    const s = JSON.parse(localStorage.getItem("cf.views") ?? "{}");
+    const s = JSON.parse(localStorage.getItem("sg.views") ?? "{}");
     return s.views?.find((v) => v.id === s.active)?.columns ?? [];
   });
   const cols = await order();
